@@ -8,24 +8,39 @@ Basics:
 Encoding:
 [range] (bit-size)
 [7:6]: (2) option (red, kin, etc.; basically ignored in this module)
-[5:4]: (2) kind (man, pin, so, zu)
-[3:0]: (4) 1..9 number (1..7 for zu-hai)
+[5:4]: (2) 0..=3 kind (man, pin, so, zu)
+[3:0]: (4) 1..=9 number (1..=7 for zu-hai)
 (0x00 is invalid)
 */
 
-const HAI_KIND_MASK :u8 = 0x30;
-const HAI_NUM_MASK  :u8 = 0x0f;
+const HAI_OPT_MASK :u8 = 0xC0;
+const HAI_KND_MASK :u8 = 0x30;
+const HAI_NUM_MASK :u8 = 0x0f;
+const HAI_OPT_SFT  :u32 = 6;
+const HAI_KND_SFT  :u32 = 4;
+const HAI_NUM_SFT  :u32 = 0;
 
-// returns (kind, number)
-fn decode(code: u8) -> (u8, u8) {
-    let kind = code & HAI_KIND_MASK;
-    let num  = code & HAI_NUM_MASK;
-
+fn validate(kind: u8, num: u8, opt: u8) {
     assert!(kind <= 3);
     assert!(num >= 1 && num <= 9);
     if kind == 3 {
         assert!(num <= 7);
     }
+    assert!(opt < 4);
+}
 
-    (kind, num)
+// returns (kind, number, opt)
+pub fn decode(code: u8) -> (u8, u8, u8) {
+    let opt  = (code & HAI_OPT_MASK) >> HAI_OPT_SFT;
+    let kind = (code & HAI_KND_MASK) >> HAI_KND_SFT;
+    let num  = (code & HAI_NUM_MASK) >> HAI_NUM_SFT;
+    validate(kind, num, opt);
+
+    (kind, num, opt)
+}
+
+pub fn encode(kind: u8, num: u8, opt: u8) -> u8 {
+    validate(kind, num, opt);
+
+    (opt << HAI_OPT_SFT) | (kind << HAI_KND_SFT) | (num << HAI_NUM_SFT)
 }
