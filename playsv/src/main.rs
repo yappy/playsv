@@ -15,8 +15,10 @@ const GIT_VERSION: &str = git_version!();
 
 // shared with all App threads
 struct AppState {
+    // next game room id to be created
     next_id: AtomicU64,
-    games: RwLock<BTreeMap<u64, mj::GameState>>,
+    // (id -> Game) sorted list
+    games: RwLock<BTreeMap<u64, mj::Game>>,
 }
 
 fn simple_html(title: &str, body: &str) -> String {
@@ -69,7 +71,8 @@ async fn index(data: web::Data<AppState>) -> impl Responder {
 
 #[get("/create")]
 async fn create(data: web::Data<AppState>) -> impl Responder {
-    let new_game = mj::GameState::new();
+    let new_game = mj::Game::new();
+    new_game.init();
     {
         // wlock
         let mut games = data.games.write().unwrap();

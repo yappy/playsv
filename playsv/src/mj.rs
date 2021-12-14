@@ -1,22 +1,35 @@
 use super::mjsys;
 use std::collections::VecDeque;
+use std::sync::RwLock;
 use rand::seq::SliceRandom;
 
+// each game is protected by indivisual rwlock
+pub struct Game {
+    state: RwLock<GameState>,
+}
+
 #[derive(Debug)]
-pub struct GameState {
+struct GameState {
     member_count: u32,
     yama: VecDeque<u8>,
     hand: Vec<Vec<u8>>,
 }
 
-impl GameState {
-    pub fn new() -> GameState {
-        let mut obj = GameState {
+impl Game {
+    pub fn new() -> Game {
+        let state = GameState {
             member_count: 4,
             yama: VecDeque::new(),
             hand: vec![]
         };
 
+        Game {
+            state: RwLock::new(state)
+        }
+    }
+
+    pub fn init(&self) {
+        let mut state = self.state.write().unwrap();
         // Create yama
         {
             let mut yama_tmp: Vec<u8> = vec![];
@@ -35,9 +48,7 @@ impl GameState {
             let mut rng = rand::thread_rng();
             yama_tmp.shuffle(&mut rng);
 
-            obj.yama = yama_tmp.into()
+            state.yama = yama_tmp.into()
         }
-
-        obj
     }
 }
