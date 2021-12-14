@@ -5,6 +5,8 @@ use git_version::git_version;
 use actix_web::{get, web, App, HttpResponse, HttpServer, Responder};
 use serde::{Serialize};
 use serde_json;
+use std::collections::BTreeMap;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::RwLock;
 
 
@@ -13,7 +15,8 @@ const GIT_VERSION: &str = git_version!();
 
 // shared with all App threads
 struct AppState {
-    games: RwLock<Vec<mj::GameState>>,
+    next_id: AtomicU64,
+    games: RwLock<BTreeMap<u64, mj::GameState>>,
 }
 
 fn simple_html(title: &str, body: &str) -> String {
@@ -51,22 +54,28 @@ async fn info() -> impl Responder {
 
 #[get("/")]
 async fn index(data: web::Data<AppState>) -> impl Responder {
-    let len;
+    let mut msg = "".to_string();
     {
+        // rlock
         let games = data.games.read().unwrap();
-        len = games.len();
+        for (k, _v) in &*games {
+            msg.push_str(&format!("<p>{}</p>\n", k));
+        }
         // unlock
     }
 
-    HttpResponse::Ok().body(simple_html("Hello",
-        &format!{"There is/are {} game(s).", len}))
+    HttpResponse::Ok().body(simple_html("Hello", &msg))
 }
 
 #[get("/create")]
 async fn create(data: web::Data<AppState>) -> impl Responder {
+    let new_game = mj::GameState::new();
     {
+        // wlock
         let mut games = data.games.write().unwrap();
-        games.push(mj::GameState::new());
+        // load and increment atomically
+        let id = data.next_id.fetch_add(1, Ordering::Relaxed);
+        games.insert(id, new_game);
         // unlock
     }
 
@@ -77,7 +86,8 @@ async fn create(data: web::Data<AppState>) -> impl Responder {
 async fn main() -> std::io::Result<()> {
     // create shared state object (Arc internally)
     let app_state = web::Data::new(AppState {
-        games: RwLock::new(vec![]),
+        next_id: AtomicU64::new(1),
+        games: RwLock::new(BTreeMap::new()),
     });
 
     // pass a function as App builder

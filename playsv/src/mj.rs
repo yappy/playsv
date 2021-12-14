@@ -1,6 +1,5 @@
 use super::mjsys;
 use std::collections::VecDeque;
-use rand::thread_rng;
 use rand::seq::SliceRandom;
 
 #[derive(Debug)]
