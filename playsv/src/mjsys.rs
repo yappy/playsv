@@ -7,18 +7,18 @@ Basics:
 
 Encoding:
 [range] (bit-size)
-[7:6]: (2) option (red, kin, etc.; basically ignored in this module)
-[5:4]: (2) 0..=3 kind (man, pin, so, zu)
-[3:0]: (4) 1..=9 number (1..=7 for zu-hai)
+[7:6]: (2) 0..=3 kind (man, pin, so, zu)
+[5:2]: (4) 1..=9 number (1..=7 for zu-hai)
+[0:1]: (2) option (red, kin, etc.; basically ignored in this module)
 (0x00 is invalid)
 */
 
-const HAI_OPT_MASK :u8 = 0xC0;
-const HAI_KND_MASK :u8 = 0x30;
-const HAI_NUM_MASK :u8 = 0x0f;
-const HAI_OPT_SFT  :u32 = 6;
-const HAI_KND_SFT  :u32 = 4;
-const HAI_NUM_SFT  :u32 = 0;
+const HAI_KND_MASK :u8 = 0xc0;
+const HAI_NUM_MASK :u8 = 0x3c;
+const HAI_OPT_MASK :u8 = 0x03;
+const HAI_KND_SFT  :u32 = 6;
+const HAI_NUM_SFT  :u32 = 2;
+const HAI_OPT_SFT  :u32 = 0;
 
 fn validate(kind: u8, num: u8, opt: u8) {
     assert!(kind <= 3);
