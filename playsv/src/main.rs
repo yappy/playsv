@@ -2,8 +2,8 @@ mod mj;
 mod mjsys;
 
 use git_version::git_version;
-use actix_web::{get, web, App, HttpResponse, HttpServer, Responder};
-use serde::{Serialize};
+use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
+use serde::{Serialize, Deserialize};
 use serde_json;
 use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -19,22 +19,6 @@ struct AppState {
     next_id: AtomicU64,
     // (id -> Game) sorted list
     games: RwLock<BTreeMap<u64, mj::Game>>,
-}
-
-fn simple_html(title: &str, body: &str) -> String {
-    format!(r#"
-<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8"/>
-<title>{}</title>
-</head>
-<body>
-{}
-</body>
-</html>
-"#,
-        title, body)
 }
 
 #[get("/info")]
@@ -69,20 +53,50 @@ async fn index(data: web::Data<AppState>) -> impl Responder {
     HttpResponse::Ok().body(simple_html("Hello", &msg))
 }
 
-#[get("/create")]
-async fn create(data: web::Data<AppState>) -> impl Responder {
+/*
+ * URL: /game
+ * Get/Add-to active game list
+ */
+#[get("/game")]
+async fn get_game(data: web::Data<AppState>) -> impl Responder {
+    // not implemented yet
+    HttpResponse::MethodNotAllowed()
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct PostGameParam {
+    game_type: String,
+    comment: String,
+}
+#[derive(Serialize, Deserialize)]
+struct PostGameResult {
+    id: u64,
+}
+
+// curl -X POST -H "Content-Type: application/json" -d '{"game_type": "aaa", "comment": "bbb"}' -v localhost:8080/game
+#[post("/game")]
+async fn post_game(data: web::Data<AppState>, param: web::Json<PostGameParam>) -> impl Responder {
+    println!("POST /game {:?}", param);
+
+    // create a new game state
     let new_game = mj::Game::new();
     new_game.init();
+
+    let id;
     {
         // wlock
         let mut games = data.games.write().unwrap();
-        // load and increment atomically
-        let id = data.next_id.fetch_add(1, Ordering::Relaxed);
+        // load next id and increment atomically
+        id = data.next_id.fetch_add(1, Ordering::Relaxed);
+        // modify shared data
         games.insert(id, new_game);
         // unlock
     }
 
-    HttpResponse::Ok().body(r#"<meta http-equiv="refresh" content="0;URL=./">"#)
+    let result = PostGameResult{id};
+    let body = serde_json::to_string(&id).unwrap();
+
+    HttpResponse::Ok().content_type("application/json").body(body)
 }
 
 #[actix_web::main]
@@ -100,9 +114,25 @@ async fn main() -> std::io::Result<()> {
             .app_data(app_state.clone())
             .service(index)
             .service(info)
-            .service(create)
+            .service(get_game)
+            .service(post_game)
     })
     .bind("127.0.0.1:8080")?
     .run()
     .await
+}
+
+fn simple_html(title: &str, body: &str) -> String {
+    format!(r#"<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8"/>
+<title>{}</title>
+</head>
+<body>
+{}
+</body>
+</html>
+"#,
+        title, body)
 }
