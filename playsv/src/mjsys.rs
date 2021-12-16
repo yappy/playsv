@@ -30,6 +30,7 @@ fn validate(kind: u8, num: u8, opt: u8) {
 }
 
 // returns (kind, number, opt)
+#[allow(dead_code)]
 pub fn decode(code: u8) -> (u8, u8, u8) {
     let opt  = (code & HAI_OPT_MASK) >> HAI_OPT_SFT;
     let kind = (code & HAI_KND_MASK) >> HAI_KND_SFT;
