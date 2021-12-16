@@ -13,12 +13,15 @@ use std::sync::RwLock;
 // from build system
 const GIT_VERSION: &str = git_version!();
 
+// description, message, etc.
+const STRING_MAX: usize = 1024;
+
 // shared with all App threads
 struct AppState {
     // next game room id to be created
     next_id: AtomicU64,
-    // (id -> Game) sorted list
-    games: RwLock<BTreeMap<u64, mj::Game>>,
+    // (id -> Game, comment) sorted list
+    games: RwLock<BTreeMap<u64, (mj::Game, String)>>,
 }
 
 #[get("/info")]
@@ -57,15 +60,38 @@ async fn index(data: web::Data<AppState>) -> impl Responder {
  * URL: /game
  * Get/Add-to active game list
  */
-#[get("/game")]
-async fn get_game(data: web::Data<AppState>) -> impl Responder {
-    // not implemented yet
-    HttpResponse::MethodNotAllowed()
+#[derive(Serialize, Deserialize)]
+struct GetGameResultElement {
+    id: u64,
+    comment: String,
+}
+
+#[derive(Serialize, Deserialize)]
+struct GetGameResult {
+    games: Vec<GetGameResultElement>,
+}
+
+#[get("/games")]
+async fn get_games(data: web::Data<AppState>) -> impl Responder {
+    let result;
+    {
+        // rlock
+        let games = data.games.read().unwrap();
+        let list = games.iter().map(
+            |(id, (_game, comment))|
+                GetGameResultElement{id: *id, comment: comment.clone()}
+            ).collect();
+        result = GetGameResult{games: list};
+        // unlock
+    }
+    let body = serde_json::to_string(&result).unwrap();
+
+    HttpResponse::Ok().content_type("application/json").body(body)
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 struct PostGameParam {
-    game_type: String,
+    //game_type: String,
     comment: String,
 }
 #[derive(Serialize, Deserialize)]
@@ -73,10 +99,13 @@ struct PostGameResult {
     id: u64,
 }
 
-// curl -X POST -H "Content-Type: application/json" -d '{"game_type": "aaa", "comment": "bbb"}' -v localhost:8080/game
-#[post("/game")]
-async fn post_game(data: web::Data<AppState>, param: web::Json<PostGameParam>) -> impl Responder {
+// curl -X POST -H "Content-Type: application/json" -d '{"comment": "aaa"}' -v localhost:8080/games
+#[post("/games")]
+async fn post_games(data: web::Data<AppState>, param: web::Json<PostGameParam>) -> impl Responder {
     println!("POST /game {:?}", param);
+    if param.comment.len() > STRING_MAX {
+        return HttpResponse::BadRequest().finish();
+    }
 
     // create a new game state
     let new_game = mj::Game::new();
@@ -88,13 +117,12 @@ async fn post_game(data: web::Data<AppState>, param: web::Json<PostGameParam>) -
         let mut games = data.games.write().unwrap();
         // load next id and increment atomically
         id = data.next_id.fetch_add(1, Ordering::Relaxed);
-        // modify shared data
-        games.insert(id, new_game);
+        games.insert(id, (new_game, param.comment.clone()));
         // unlock
     }
 
     let result = PostGameResult{id};
-    let body = serde_json::to_string(&id).unwrap();
+    let body = serde_json::to_string(&result).unwrap();
 
     HttpResponse::Ok().content_type("application/json").body(body)
 }
@@ -114,8 +142,8 @@ async fn main() -> std::io::Result<()> {
             .app_data(app_state.clone())
             .service(index)
             .service(info)
-            .service(get_game)
-            .service(post_game)
+            .service(get_games)
+            .service(post_games)
     })
     .bind("127.0.0.1:8080")?
     .run()
