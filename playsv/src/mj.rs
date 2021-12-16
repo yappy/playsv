@@ -39,7 +39,7 @@ pub struct Game {
 #[derive(Debug)]
 struct GameState {
     // constant
-    member_count: u32,
+    player_count: u32,
     round_max: u32,
     // variable
     round: u32,
@@ -57,18 +57,29 @@ struct View {
 }
 
 impl Game {
-    pub fn new() -> Option<Game> {
+    pub fn new() -> Result<Game, String> {
         let mut state = GameState::new();
         // TODO: pass rule config
-        state.init();
-
-        Some(Game {
-            state: RwLock::new(state)
-        })
+        match state.init() {
+            // After this, it is necessary to take a lock for GameState access
+            Ok(()) => Ok(Game {state: RwLock::new(state)}),
+            Err(msg) => Err(msg),
+        }
     }
 
     #[allow(dead_code)]
-    pub fn action(&self) {
+    pub fn get_view(&self, player: u32) -> Result<(), String> {
+        let state = self.state.read().unwrap();
+        if player >= state.player_count {
+            return Err(format!("Invalid player: {}", player));
+        }
+
+        // TODO
+        Ok(())
+    }
+
+    #[allow(dead_code)]
+    pub fn action(&mut self) {
         let mut _state = self.state.write().unwrap();
         // ...
     }
@@ -77,19 +88,33 @@ impl Game {
 impl GameState {
     fn new() -> GameState {
         GameState {
-            member_count: 2,
-            round_max: 4,
-            round: 1,
-            points: [25000; 4],
+            player_count: 0,
+            round_max: 0,
+            round: 0,
+            points: Default::default(),
             yama: VecDeque::new(),
             hands: Default::default(),
         }
     }
 
-    fn init(&mut self) {
+    fn init(&mut self) -> Result<(), String> {
         // TODO: receive rule config and set
+        self.player_count = 2;
+        let player_size = self.player_count as usize;
+        self.round_max = 4;
+        self.round = 1;
+        for (i, p) in self.points.iter_mut().enumerate() {
+            *p = if i < player_size { 25000 } else { 0 };
+        }
+        self.yama.clear();
+        for hand in self.hands.iter_mut() {
+            hand.clear();
+        }
+
         // init as Round 1 start state
         self.next_round(1);
+
+        Ok(())
     }
 
     fn next_round(&mut self, round: u32) {
@@ -114,5 +139,6 @@ impl GameState {
 
             self.yama = yama_tmp.into();
         }
+        // TODO: haipai
     }
 }

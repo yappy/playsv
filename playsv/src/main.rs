@@ -24,6 +24,20 @@ struct AppState {
     games: RwLock<BTreeMap<u64, (mj::Game, String)>>,
 }
 
+/*
+ * Common error response (Not 2XX response)
+ */
+#[derive(Serialize, Deserialize)]
+struct ErrorMsg {
+    message: String,
+}
+
+fn error_json(message: String) -> String {
+    let obj = ErrorMsg{message};
+
+    serde_json::to_string(&obj).unwrap()
+}
+
 #[get("/info")]
 async fn info() -> impl Responder {
     #[derive(Serialize)]
@@ -109,8 +123,11 @@ async fn post_games(data: web::Data<AppState>, param: web::Json<PostGameParam>) 
 
     // create a new game state
     let new_game = match mj::Game::new() {
-        Some(game) => game,
-        None => {return HttpResponse::BadRequest().finish();}
+        Ok(game) => game,
+        Err(msg) => {
+            return HttpResponse::BadRequest().content_type("application/json")
+                .body(error_json(msg.to_string()));
+        },
     };
 
     let id;
