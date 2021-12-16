@@ -108,8 +108,10 @@ async fn post_games(data: web::Data<AppState>, param: web::Json<PostGameParam>) 
     }
 
     // create a new game state
-    let new_game = mj::Game::new();
-    new_game.init();
+    let new_game = match mj::Game::new() {
+        Some(game) => game,
+        None => {return HttpResponse::BadRequest().finish();}
+    };
 
     let id;
     {
