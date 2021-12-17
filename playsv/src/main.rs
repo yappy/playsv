@@ -146,6 +146,37 @@ async fn post_games(data: web::Data<AppState>, param: web::Json<PostGameParam>) 
     HttpResponse::Ok().content_type("application/json").body(body)
 }
 
+#[get("/games/{id}/{player}")]
+async fn get_games_id(data: web::Data<AppState>, path: web::Path<(u64, u32)>) -> impl Responder {
+    let (id, player) = path.into_inner();
+
+    {
+        // rlock game list
+        let games = data.games.read().unwrap();
+        let game = games.get(&id);
+        if let Some(game) = game {
+            let view = game.0.get_view(player);
+            match view {
+                Ok(result) => {
+                    return HttpResponse::Ok()
+                        .content_type("application/json")
+                        .body(result)
+                },
+                Err(msg) => {
+                    return HttpResponse::BadRequest()
+                        .content_type("application/json")
+                        .body(error_json(msg))
+                },
+            }
+        }
+        else {
+            return HttpResponse::BadRequest().content_type("application/json")
+                .body(error_json("Invalid id".to_string()))
+        }
+        // unlock
+    }
+}
+
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     // create shared state object (Arc internally)
@@ -163,6 +194,7 @@ async fn main() -> std::io::Result<()> {
             .service(info)
             .service(get_games)
             .service(post_games)
+            .service(get_games_id)
     })
     .bind("127.0.0.1:8080")?
     .run()

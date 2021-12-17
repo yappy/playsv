@@ -71,15 +71,17 @@ impl Game {
         }
     }
 
-    #[allow(dead_code)]
-    pub fn get_view(&self, player: u32) -> Result<(), String> {
+    pub fn get_view(&self, player: u32) -> Result<String, String> {
         let state = self.state.read().unwrap();
         if player >= state.player_count {
-            return Err(format!("Invalid player: {}", player));
+            return Err("Invalid player: {}".to_string());
         }
 
         // TODO
-        Ok(())
+        let result = View{hand: vec![], draw: 0};
+        let result = serde_json::to_string(&result).unwrap();
+
+        Ok(result)
     }
 
     #[allow(dead_code)]
