@@ -55,9 +55,9 @@ struct GameState {
 // board view from each player
 #[derive(Debug, Serialize, Deserialize)]
 struct View {
-    hand: Vec<u8>,
+    hand: [Vec<i32>; 4],
     // != 0 if you have drawn this hai just now
-    draw: u8,
+    draw: [i32; 4],
 }
 
 impl Game {
@@ -78,7 +78,7 @@ impl Game {
         }
 
         // TODO
-        let result = View{hand: vec![], draw: 0};
+        let result = View{hand: Default::default(), draw: [0; 4]};
         let result = serde_json::to_string(&result).unwrap();
 
         Ok(result)

@@ -71,7 +71,7 @@ async fn index(data: web::Data<AppState>) -> impl Responder {
 }
 
 /*
- * URL: /game
+ * URL: /games
  * Get/Add-to active game list
  */
 #[derive(Serialize, Deserialize)]
