@@ -9,6 +9,7 @@ enum Method {
 struct NetworkTask {
     url: String,
     method: Method,
+    content_type: String,
     body: String,
 }
 
@@ -18,6 +19,8 @@ struct MainApp {
     host: String,
     get_path: String,
     post_path: String,
+    post_ctype: String,
+    post_body: String,
     res_msg: String,
 }
 
@@ -28,6 +31,8 @@ impl MainApp {
             host: "http://127.0.0.1:8080".to_string(),
             get_path: "/games".to_string(),
             post_path: "/games".to_string(),
+            post_ctype: "application/json".to_string(),
+            post_body: r#"{"comment": "test room"}"#.to_string(),
             res_msg: "".to_string(),
         }
     }
@@ -53,7 +58,12 @@ impl epi::App for MainApp {
             ui.horizontal(|ui| {
                 if ui.button("GET   ").clicked() {
                     let url = self.host.clone() + &self.get_path;
-                    let task = NetworkTask {url, method: Method::GET, body: "".to_string()};
+                    let task = NetworkTask {
+                        url,
+                        method: Method::GET,
+                        content_type: "".to_string(),
+                        body: "".to_string()
+                    };
                     let _ = self.tx.try_send(task);
                     self.res_msg = "Please wait...".to_string();
                 }
@@ -62,16 +72,30 @@ impl epi::App for MainApp {
             ui.horizontal(|ui| {
                 if ui.button("POST").clicked() {
                     let url = self.host.clone() + &self.post_path;
-                    let task = NetworkTask {url, method: Method::POST, body: "".to_string()};
+                    let task = NetworkTask {
+                        url,
+                        method: Method::POST,
+                        content_type: self.post_ctype.clone(),
+                        body: self.post_body.clone(),
+                    };
                     let _ = self.tx.try_send(task);
                     self.res_msg = "Please wait...".to_string();
                 }
                 ui.text_edit_singleline(&mut self.post_path);
             });
 
+            ui.horizontal(|ui| {
+                ui.label("POST Content-Type: ");
+                ui.text_edit_singleline(&mut self.post_ctype);
+            });
+            ui.label("POST Body");
+            ui.code_editor(&mut self.post_body);
+
+            ui.label("Response");
             ui.code(&self.res_msg);
         });
 
+        // Call update() at 60 fps to poll channel
         ctx.request_repaint();
     }
 }
@@ -87,6 +111,7 @@ fn network_thread_entry(tx: mpsc::Sender<String>, rx: mpsc::Receiver<NetworkTask
                     .send(),
             Method::POST =>
                 client.post(task.url)
+                    .header(reqwest::header::CONTENT_TYPE, task.content_type)
                     .body(task.body)
                     .send(),
         };
