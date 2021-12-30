@@ -15,14 +15,18 @@ https://visualstudio.microsoft.com/visual-cpp-build-tools/
 $ rustup update
 ```
 
-## Cross Build on WSL2
-1. Install WSL2.
-1. Install Docker Desktop for Windows. (Enable WSL2 support on installer)
-1. `$ rustup install cross`
-1. `$ cross build --target x86_64-pc-windows-gnu`
-
-## Build
+## Build + Run
 ```
 $ cd <project_dir>
-$ cargo build
+$ cargo build [--release]
+$ cargo run [--release]
+```
+
+## Cross Build for Windows on WSL2
+```
+$ rustup target add x86_64-pc-windows-gnu
+$ sudo apt install mingw-w64
+$ cargo build --target x86_64-pc-windows-gnu [--release]
+# You can execute windows .exe binary from WSL2 directly
+$ cargo run --target x86_64-pc-windows-gnu [--release]
 ```
