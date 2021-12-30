@@ -1,13 +1,10 @@
 [package]
-name = "playsv"
+name = "testgui"
 version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-git-version = "0.3.5"
-actix-web = "3.3.2"
-serde = "1.0.130"
-serde_json = "1.0.68"
-rand = "0.8.4"
+eframe = "0.15.0"
+reqwest = { version = "0.11.8", features = ["blocking"] }
