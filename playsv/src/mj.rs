@@ -1,5 +1,4 @@
 use super::mjsys;
-use std::collections::VecDeque;
 use std::sync::RwLock;
 use rand::seq::SliceRandom;
 use serde::{Serialize, Deserialize};
@@ -36,28 +35,61 @@ pub struct Game {
     state: RwLock<GameState>,
 }
 
+// main game status control data
 #[derive(Debug)]
 struct GameState {
+    // common view to all players as is
+    common: CommonState,
+    // hidden or player-dependent view
+    internal: InternalState,
+}
+
+// publish to each player as json
+#[derive(Debug, Serialize, Deserialize)]
+struct LocalView {
+    common: CommonState,
+    local: LocalState,
+}
+
+// the same view from all players
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+struct CommonState {
     // constant
     player_count: u32,
     round_max: u32,
-    // variable
+    // active player index and phase
+    turn: u32,
+    phase: GamePhase,
     // wind 0..round_max, parent 0..player_count, hon
     wind: u32,
     parent: u32,
     hon: u32,
-    points: [u32; 4],
-    yama: VecDeque<u8>,
-    turn: u32,
-    hands: [Vec<u8>; 4],
+    // TODO
+    // dora
 }
 
-// board view from each player
-#[derive(Debug, Serialize, Deserialize)]
-struct View {
-    hand: [Vec<i32>; 4],
-    // != 0 if you have drawn this hai just now
-    draw: [i32; 4],
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+enum GamePhase {
+    WaitAction,
+    WaitReaction,
+    ShowResult,
+}
+
+// player-dependent data (managed by system)
+#[derive(Debug, Default)]
+struct InternalState {
+    points: Vec<i32>,
+    yama: Vec<i32>,
+    // wang pai
+    yama2: Vec<i32>,
+    hands: Vec<Vec<i32>>,
+}
+
+// player-dependent data view
+#[derive(Debug, Default, Serialize, Deserialize)]
+struct LocalState {
+    points: [i32; 4],
+    hands: [Vec<i32>; 4],
 }
 
 impl Game {
@@ -66,21 +98,36 @@ impl Game {
         // TODO: pass rule config
         match state.init() {
             // After this, it is necessary to take a lock for GameState access
-            Ok(()) => Ok(Game {state: RwLock::new(state)}),
+            Ok(()) => Ok(Game { state: RwLock::new(state) }),
             Err(msg) => Err(msg),
         }
     }
 
     pub fn get_view(&self, player: u32) -> Result<String, String> {
-        let state = self.state.read().unwrap();
-        if player >= state.player_count {
+        // read lock and (common, internal) <- state
+        let GameState { common, internal } = &*self.state.read().unwrap();
+        if player >= common.player_count {
             return Err("Invalid player: {}".to_string());
         }
 
+        // result struct for json output
+        // copy common field
+        let mut result = LocalView { common: *common, local: Default::default() };
+        // covert internal -> local view
         // TODO
-        let result = View{hand: Default::default(), draw: [0; 4]};
-        let result = serde_json::to_string(&result).unwrap();
+        for i in 0..common.player_count {
+            // i = global player index
+            // p = local player index
+            let p = (player + i) % common.player_count;
 
+            let i = i as usize;
+            let p = p as usize;
+
+            // TODO covert hand
+        }
+
+        // return as json string
+        let result = serde_json::to_string(&result).unwrap();
         Ok(result)
     }
 
@@ -94,41 +141,45 @@ impl Game {
 impl GameState {
     fn new() -> GameState {
         GameState {
-            player_count: 0,
-            round_max: 0,
-            wind: 0,
-            parent: 0,
-            hon: 0,
-            points: Default::default(),
-            yama: VecDeque::new(),
-            turn: 0,
-            hands: Default::default(),
+            common: CommonState {
+                player_count: 0,
+                round_max: 0,
+                turn: 0,
+                phase: GamePhase::WaitAction,
+                wind: 0,
+                parent: 0,
+                hon: 0,
+            },
+            internal: Default::default(),
         }
     }
 
     fn check(&self) {
-        assert!(2 >= self.player_count && self.player_count <= 4);
-        assert!(self.round_max <= 4);
-        assert!(self.wind < 4);
-        assert!(self.parent < self.player_count);
-        assert!(self.turn < self.player_count);
+        let GameState { common, internal } = self;
+        assert!(2 >= common.player_count && common.player_count <= 4);
+        assert!(common.round_max <= 4);
+        assert!(common.wind < 4);
+        assert!(common.parent < common.player_count);
+        assert!(common.turn < common.player_count);
     }
 
     fn init(&mut self) -> Result<(), String> {
+        let (common, internal) = (&mut self.common, &mut self.internal);
+
         // TODO: receive rule config and set
-        self.player_count = 2;
-        let player_size = self.player_count as usize;
-        self.round_max = 4;
-        self.wind = 0;
-        self.parent = 0;
-        self.hon = 0;
-        for (i, p) in self.points.iter_mut().enumerate() {
+        common.player_count = 2;
+        let player_size = common.player_count as usize;
+        common.round_max = 4;
+        common.turn = 0;
+        common.wind = 0;
+        common.parent = 0;
+        common.hon = 0;
+        for (i, p) in internal.points.iter_mut().enumerate() {
             *p = if i < player_size { 25000 } else { 0 };
         }
-        self.yama.clear();
-        self.turn = 0;
-        for hand in self.hands.iter_mut() {
-            hand.clear();
+        internal.yama.clear();
+        for _ in 0..common.player_count {
+            internal.hands.push(vec![]);
         }
 
         // init as tong 1 kyoku 0 hon start
@@ -140,48 +191,50 @@ impl GameState {
     }
 
     fn next_round(&mut self, wind: u32, parent: u32, hon: u32) {
-        self.wind = wind;
-        self.parent = parent;
-        self.hon = hon;
+        let (common, internal) = (&mut self.common, &mut self.internal);
+
+        common.wind = wind;
+        common.parent = parent;
+        common.hon = hon;
         // the first turn player == parent == kyoku number
-        self.turn = parent;
+        common.turn = parent;
         // Create yama
         {
-            let mut yama_tmp: Vec<u8> = vec![];
+            let mut yama_tmp: Vec<i32> = vec![];
             // man, pin, so: 0, 1, 2
             for kind in 0..3 {
                 // 1-9
                 for num in 1..=9 {
-                    yama_tmp.push(mjsys::encode(kind, num, 0));
+                    yama_tmp.push(mjsys::encode(kind, num, 0) as i32);
                 }
             }
             // zu: 3
             for num in 1..=7 {
-                yama_tmp.push(mjsys::encode(3, num, 0));
+                yama_tmp.push(mjsys::encode(3, num, 0) as i32);
             }
             // thread_local cryptographically secure PRNG
             let mut rng = rand::thread_rng();
             yama_tmp.shuffle(&mut rng);
 
-            self.yama = yama_tmp.into();
+            internal.yama = yama_tmp.into();
         }
         // haipai
         {
             // 4 times
             for count in 0..4 {
                 // parent-origin, for each player
-                for i in 0..self.player_count {
-                    let player = (parent + i) % self.player_count;
+                for i in 0..common.player_count {
+                    let player = (parent + i) % common.player_count;
                     // take 4, 4, 4, 1
                     let take_num = if count == 3 { 1 } else { 4 };
                     for _ in 0..take_num {
-                        let hai = self.yama.pop_back().unwrap();
-                        self.hands[player as usize].push(hai);
+                        let hai = internal.yama.pop().unwrap();
+                        internal.hands[player as usize].push(hai);
                     }
                 }
             }
-            for i in 0..self.player_count {
-                assert!(self.hands[i as usize].len() == 13);
+            for i in 0..common.player_count {
+                assert!(internal.hands[i as usize].len() == 13);
             }
         }
         self.check();
