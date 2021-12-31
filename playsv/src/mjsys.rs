@@ -46,9 +46,9 @@ pub fn encode(kind: u8, num: u8, opt: u8) -> u8 {
     (opt << HAI_OPT_SFT) | (kind << HAI_KND_SFT) | (num << HAI_NUM_SFT)
 }
 
-pub fn to_string(code: u8) -> String {
+pub fn human_readable_string(code: u8) -> String {
     let kind_char = ['m', 'p', 's', 'z'];
     let (_opt, kind, num) = decode(code);
 
-    format!("{}{}", num, kind)
+    format!("{}{}", num, kind_char[kind as usize])
 }

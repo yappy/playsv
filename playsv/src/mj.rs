@@ -78,10 +78,10 @@ enum GamePhase {
 // player-dependent data (managed by system)
 #[derive(Debug, Default)]
 struct InternalState {
-    points: Vec<i32>,
     yama: Vec<i32>,
     // wang pai
     yama2: Vec<i32>,
+    points: Vec<i32>,
     hands: Vec<Vec<i32>>,
 }
 
@@ -111,24 +111,46 @@ impl Game {
         }
 
         // result struct for json output
-        // copy common field
-        let mut result = LocalView { common: *common, local: Default::default() };
-        // covert internal -> local view
-        // TODO
-        for i in 0..common.player_count {
-            // i = global player index
-            // p = local player index
-            let p = (player + i) % common.player_count;
-
-            let i = i as usize;
-            let p = p as usize;
-
-            // TODO covert hand
-        }
+        let result = LocalView {
+            // copy common field
+            common: *common,
+            // convert from internal
+            local: Self::convert_to_local_state(&common, &internal, player),
+        };
 
         // return as json string
         let result = serde_json::to_string(&result).unwrap();
         Ok(result)
+    }
+
+    fn convert_to_local_state(
+        common: &CommonState,
+        internal: &InternalState,
+        player: u32)
+        -> LocalState
+    {
+        let mut local: LocalState = Default::default();
+
+        for i in 0..4 {
+            // i = global player index
+            // p = local player index
+            let p = (player + i) % 4;
+
+            let ius = i as usize;
+            let pus = p as usize;
+
+            // TODO covert hand
+            if p < common.player_count {
+                local.points[ius] = internal.points[pus];
+                local.hands[ius] = internal.hands[pus].clone();
+            } else {
+                // empty seat
+                local.points[ius] = i32::MIN;
+                // local.hands[i] = [];
+            }
+        }
+
+        local
     }
 
     #[allow(dead_code)]
@@ -155,7 +177,8 @@ impl GameState {
     }
 
     fn check(&self) {
-        let GameState { common, internal } = self;
+        let (common, _internal) = (&self.common, &self.internal);
+
         assert!(2 >= common.player_count && common.player_count <= 4);
         assert!(common.round_max <= 4);
         assert!(common.wind < 4);
@@ -174,11 +197,11 @@ impl GameState {
         common.wind = 0;
         common.parent = 0;
         common.hon = 0;
-        for (i, p) in internal.points.iter_mut().enumerate() {
-            *p = if i < player_size { 25000 } else { 0 };
-        }
+
         internal.yama.clear();
+        internal.yama2.clear();
         for _ in 0..common.player_count {
+            internal.points.push(25000);
             internal.hands.push(vec![]);
         }
 
