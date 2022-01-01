@@ -90,6 +90,7 @@ struct InternalState {
 struct LocalState {
     points: [i32; 4],
     hands: [Vec<i32>; 4],
+    hands_str: [Vec<String>; 4],
 }
 
 impl Game {
@@ -143,6 +144,10 @@ impl Game {
             if p < common.player_count {
                 local.points[ius] = internal.points[pus];
                 local.hands[ius] = internal.hands[pus].clone();
+                for hai in &*local.hands[ius] {
+                    let code = *hai as u16;
+                    local.hands_str[ius].push(mjsys::human_readable_string(code));
+                }
             } else {
                 // empty seat
                 local.points[ius] = i32::MIN;
@@ -191,7 +196,6 @@ impl GameState {
 
         // TODO: receive rule config and set
         common.player_count = 2;
-        let player_size = common.player_count as usize;
         common.round_max = 4;
         common.turn = 0;
         common.wind = 0;
@@ -257,7 +261,9 @@ impl GameState {
                 }
             }
             for i in 0..common.player_count {
-                assert!(internal.hands[i as usize].len() == 13);
+                let i = i as usize;
+                assert!(internal.hands[i].len() == 13);
+                internal.hands[i].sort_unstable();
             }
         }
         self.check();
