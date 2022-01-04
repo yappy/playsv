@@ -116,7 +116,7 @@ impl Game {
             // copy common field
             common: *common,
             // convert from internal
-            local: Self::convert_to_local_state(&common, &internal, player),
+            local: Self::convert_to_local_state(common, internal, player),
         };
 
         // return as json string
@@ -243,7 +243,7 @@ impl GameState {
             let mut rng = rand::thread_rng();
             yama_tmp.shuffle(&mut rng);
 
-            internal.yama = yama_tmp.into();
+            internal.yama = yama_tmp;
         }
         // haipai
         {

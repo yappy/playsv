@@ -22,7 +22,7 @@ const HAI_NUM_SFT  :u32 = 0;
 
 fn validate(kind: u16, num: u16, opt: u16) {
     assert!(kind <= 3);
-    assert!(num >= 1 && num <= 9);
+    assert!((1..=9).contains(&num));
     if kind == 3 {
         assert!(num <= 7);
     }

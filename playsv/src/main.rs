@@ -4,7 +4,6 @@ mod mjsys;
 use git_version::git_version;
 use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
 use serde::{Serialize, Deserialize};
-use serde_json;
 use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::RwLock;
@@ -61,7 +60,7 @@ async fn index(data: web::Data<AppState>) -> impl Responder {
     {
         // rlock
         let games = data.games.read().unwrap();
-        for (k, _v) in &*games {
+        for k in (*games).keys() {
             msg.push_str(&format!("<p>{}</p>\n", k));
         }
         // unlock
@@ -126,7 +125,7 @@ async fn post_games(data: web::Data<AppState>, param: web::Json<PostGameParam>) 
         Ok(game) => game,
         Err(msg) => {
             return HttpResponse::BadRequest().content_type("application/json")
-                .body(error_json(msg.to_string()));
+                .body(error_json(msg));
         },
     };
 

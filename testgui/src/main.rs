@@ -3,7 +3,7 @@ use std::thread;
 use std::sync::mpsc;
 
 enum Method {
-    GET, POST,
+    Get, Post,
 }
 
 struct NetworkTask {
@@ -60,7 +60,7 @@ impl epi::App for MainApp {
                     let url = self.host.clone() + &self.get_path;
                     let task = NetworkTask {
                         url,
-                        method: Method::GET,
+                        method: Method::Get,
                         content_type: "".to_string(),
                         body: "".to_string()
                     };
@@ -74,7 +74,7 @@ impl epi::App for MainApp {
                     let url = self.host.clone() + &self.post_path;
                     let task = NetworkTask {
                         url,
-                        method: Method::POST,
+                        method: Method::Post,
                         content_type: self.post_ctype.clone(),
                         body: self.post_body.clone(),
                     };
@@ -106,10 +106,10 @@ fn network_thread_entry(tx: mpsc::Sender<String>, rx: mpsc::Receiver<NetworkTask
     for task in rx {
         println!("{}", task.url);
         let resp = match task.method {
-            Method::GET =>
+            Method::Get =>
                 client.get(task.url)
                     .send(),
-            Method::POST =>
+            Method::Post =>
                 client.post(task.url)
                     .header(reqwest::header::CONTENT_TYPE, task.content_type)
                     .body(task.body)
