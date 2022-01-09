@@ -75,6 +75,24 @@ enum GamePhase {
     ShowResult,
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+enum Action {
+    // Active player
+    Discard(i32),
+    Tsumo,
+    // TODO: param
+    BlindKan,
+    SmallKan,
+
+    // Non-active player
+    Skip,
+    Ron,
+    // TODO: param
+    Chi,
+    Pon,
+    BigKan,
+}
+
 // player-dependent data (managed by system)
 #[derive(Debug, Default)]
 struct InternalState {
@@ -84,6 +102,7 @@ struct InternalState {
     points: Vec<i32>,
     hands: Vec<Vec<i32>>,
     draws: Vec<Option<i32>>,
+    actions: Vec<Vec<Action>>,
 }
 
 // player-dependent data view
@@ -94,6 +113,7 @@ struct LocalState {
     hands_str: [Vec<String>; 4],
     draws: [i32; 4],
     draws_str: [String; 4],
+    actions: Vec<Action>,
 }
 
 impl Game {
@@ -160,6 +180,10 @@ impl Game {
                     Some(hai) => mjsys::human_readable_string(hai as u16),
                     None => "".to_string(),
                 };
+                // action
+                if pus == 0 {
+                    local.actions = internal.actions[ius].clone();
+                }
             } else {
                 // empty seat
                 local.points[ius] = i32::MIN;
@@ -221,6 +245,7 @@ impl GameState {
             internal.points.push(25000);
             internal.hands.push(vec![]);
             internal.draws.push(None);
+            internal.actions.push(vec![]);
         }
 
         // init as tong 1 kyoku 0 hon start
@@ -287,6 +312,7 @@ impl GameState {
         self.check();
     }
 
+    // Turn player draws a hai
     fn draw(&mut self) {
         let (common, internal) = (&mut self.common, &mut self.internal);
 
@@ -295,7 +321,20 @@ impl GameState {
         for p in 0..common.player_count as usize {
             assert!(internal.draws[p] == None);
         }
+        // draw
         internal.draws[common.turn as usize] = Some(
             internal.yama.pop().unwrap());
+
+        // go to new state
+        common.phase = GamePhase::WaitAction;
+        for alist in &mut internal.actions {
+            alist.clear();
+        }
+        // create action list
+        let ap_actions = &mut internal.actions[common.turn as usize];
+        let ap_hand = &internal.hands[common.turn as usize];
+        for (i, _hai) in ap_hand.iter().enumerate() {
+            ap_actions.push(Action::Discard(i as i32));
+        }
     }
 }
