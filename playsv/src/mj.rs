@@ -93,7 +93,7 @@ struct LocalState {
     hands: [Vec<i32>; 4],
     hands_str: [Vec<String>; 4],
     draws: [i32; 4],
-    draws_str: [i32; 4],
+    draws_str: [String; 4],
 }
 
 impl Game {
@@ -155,7 +155,11 @@ impl Game {
                 local.draws[ius] = match internal.draws[pus] {
                     Some(hai) => hai,
                     None => -1,
-                }
+                };
+                local.draws_str[ius] = match internal.draws[pus] {
+                    Some(hai) => mjsys::human_readable_string(hai as u16),
+                    None => "".to_string(),
+                };
             } else {
                 // empty seat
                 local.points[ius] = i32::MIN;
@@ -193,7 +197,7 @@ impl GameState {
     fn check(&self) {
         let (common, _internal) = (&self.common, &self.internal);
 
-        assert!(2 >= common.player_count && common.player_count <= 4);
+        assert!(2 <= common.player_count && common.player_count <= 4);
         assert!(common.round_max <= 4);
         assert!(common.wind < 4);
         assert!(common.parent < common.player_count);
@@ -204,7 +208,7 @@ impl GameState {
         let (common, internal) = (&mut self.common, &mut self.internal);
 
         // TODO: receive rule config and set
-        common.player_count = 2;
+        common.player_count = 4;
         common.round_max = 4;
         common.turn = 0;
         common.wind = 0;
@@ -238,16 +242,18 @@ impl GameState {
         // Create yama
         {
             let mut yama_tmp: Vec<i32> = vec![];
-            // man, pin, so: 0, 1, 2
-            for kind in 0..3 {
-                // 1-9
-                for num in 1..=9 {
-                    yama_tmp.push(mjsys::encode(kind, num, 0) as i32);
+            for _ in 0..4 {
+                // man, pin, so: 0, 1, 2
+                for kind in 0..3 {
+                    // 1-9
+                    for num in 1..=9 {
+                        yama_tmp.push(mjsys::encode(kind, num, 0) as i32);
+                    }
                 }
-            }
-            // zu: 3
-            for num in 1..=7 {
-                yama_tmp.push(mjsys::encode(3, num, 0) as i32);
+                // zu: 3
+                for num in 1..=7 {
+                    yama_tmp.push(mjsys::encode(3, num, 0) as i32);
+                }
             }
             // thread_local cryptographically secure PRNG
             let mut rng = rand::thread_rng();
