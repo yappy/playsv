@@ -83,6 +83,7 @@ struct InternalState {
     yama2: Vec<i32>,
     points: Vec<i32>,
     hands: Vec<Vec<i32>>,
+    draws: Vec<Option<i32>>,
 }
 
 // player-dependent data view
@@ -91,6 +92,8 @@ struct LocalState {
     points: [i32; 4],
     hands: [Vec<i32>; 4],
     hands_str: [Vec<String>; 4],
+    draws: [i32; 4],
+    draws_str: [i32; 4],
 }
 
 impl Game {
@@ -140,18 +143,24 @@ impl Game {
             let ius = i as usize;
             let pus = p as usize;
 
-            // TODO covert hand
             if p < common.player_count {
+                // hand
                 local.points[ius] = internal.points[pus];
                 local.hands[ius] = internal.hands[pus].clone();
                 for hai in &*local.hands[ius] {
                     let code = *hai as u16;
                     local.hands_str[ius].push(mjsys::human_readable_string(code));
                 }
+                // draw
+                local.draws[ius] = match internal.draws[pus] {
+                    Some(hai) => hai,
+                    None => -1,
+                }
             } else {
                 // empty seat
                 local.points[ius] = i32::MIN;
                 // local.hands[i] = [];
+                local.draws[ius] = -1;
             }
         }
 
@@ -207,6 +216,7 @@ impl GameState {
         for _ in 0..common.player_count {
             internal.points.push(25000);
             internal.hands.push(vec![]);
+            internal.draws.push(None);
         }
 
         // init as tong 1 kyoku 0 hon start
@@ -265,7 +275,21 @@ impl GameState {
                 assert!(internal.hands[i].len() == 13);
                 internal.hands[i].sort_unstable();
             }
+            // parent draw
+            self.draw();
         }
         self.check();
+    }
+
+    fn draw(&mut self) {
+        let (common, internal) = (&mut self.common, &mut self.internal);
+
+        // all player must not have draw hai
+        // yama.len() must be > 0
+        for p in 0..common.player_count as usize {
+            assert!(internal.draws[p] == None);
+        }
+        internal.draws[common.turn as usize] = Some(
+            internal.yama.pop().unwrap());
     }
 }
