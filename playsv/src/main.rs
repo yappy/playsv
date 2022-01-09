@@ -180,7 +180,7 @@ async fn get_games_id(data: web::Data<AppState>, path: web::Path<(u64, u32)>) ->
 async fn main() -> std::io::Result<()> {
     // create shared state object (Arc internally)
     let app_state = web::Data::new(AppState {
-        next_id: AtomicU64::new(1),
+        next_id: AtomicU64::new(0),
         games: RwLock::new(BTreeMap::new()),
     });
 
