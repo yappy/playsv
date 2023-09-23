@@ -30,3 +30,7 @@ cargo install --locked trunk
 trunk build
 trunk serve
 ```
+
+```sh
+trunk build --release
+```

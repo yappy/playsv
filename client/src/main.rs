@@ -1,15 +1,42 @@
-use web_sys::window;
+use wasm_bindgen::JsCast;
+use web_sys::{Document, HtmlElement, Window};
+
+fn basics() -> (Window, Document, HtmlElement) {
+    let window = web_sys::window().unwrap();
+    let document = window.document().unwrap();
+    let body = document.body().unwrap();
+
+    (window, document, body)
+}
 
 fn app_main() {
-    let document = window().and_then(|win| win.document()).expect("Could not access document");
-    let body = document.body().expect("Could not access document.body");
-    let text_node = document.create_text_node("Hello, world from Vanilla Rust!");
-    body.append_child(text_node.as_ref()).expect("Failed to append text");
+    let (_, document, body) = basics();
+
+    let canvas = document.create_element("canvas").unwrap();
+    canvas.set_attribute("width", "640").unwrap();
+    canvas.set_attribute("height", "480").unwrap();
+
+    body.append_child(canvas.as_ref()).unwrap();
+
+    let canvas: web_sys::HtmlCanvasElement =
+        canvas.dyn_into::<web_sys::HtmlCanvasElement>().unwrap();
+    let context = canvas
+        .get_context("2d")
+        .unwrap()
+        .unwrap()
+        .dyn_into::<web_sys::CanvasRenderingContext2d>()
+        .unwrap();
+
+    context.set_fill_style(&"green".into());
+    context.fill_rect(0.0, 0.0, 640.0, 480.0);
+
+    context.begin_path();
 }
 
 fn init() {
     console_error_panic_hook::set_once();
     wasm_logger::init(wasm_logger::Config::default());
+    log::info!("Init OK");
 }
 
 fn main() {
