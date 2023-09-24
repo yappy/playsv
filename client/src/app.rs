@@ -1,6 +1,8 @@
 use std::{cell::RefCell, rc::Rc};
 use wasm_bindgen::{prelude::*, JsCast};
-use web_sys::{CanvasRenderingContext2d, Document, HtmlCanvasElement, HtmlElement, Window};
+use web_sys::{
+    CanvasRenderingContext2d, Document, HtmlCanvasElement, HtmlElement, KeyboardEvent, Window,
+};
 
 const CANVAS_W: u32 = 640;
 const CANVAS_H: u32 = 480;
@@ -55,7 +57,7 @@ impl App {
             .unwrap()
     }
 
-    fn interval_handler(&mut self) {
+    fn on_interval(&mut self) {
         let context = self.context2d();
 
         let t = self.frame as u8;
@@ -66,17 +68,26 @@ impl App {
         self.frame += 1;
     }
 
+    fn on_keydown(&mut self, event: &KeyboardEvent) {
+        log::info!("Key down: {}", event.code());
+    }
+
+    fn on_keyup(&mut self, event: &KeyboardEvent) {
+        log::info!("Key up: {}", event.code());
+    }
+
     fn start(self) {
         assert!(self.interval_id.is_none());
 
         let app = Rc::new(RefCell::new(self));
 
-        let (window, _, _) = basics();
+        let (window, document, _) = basics();
 
+        // window.setInterval()
         let cb: Closure<dyn FnMut()> = {
             let app = app.clone();
             Closure::new(move || {
-                app.borrow_mut().interval_handler();
+                app.borrow_mut().on_interval();
             })
         };
         let id = window
@@ -86,9 +97,37 @@ impl App {
             )
             .unwrap();
         cb.forget();
+        app.borrow_mut().interval_id = Some(id);
         log::info!("setInterval: {id}");
 
-        app.borrow_mut().interval_id = Some(id);
+        // document.addEventListener("keydown")
+        let cb = {
+            let app = app.clone();
+
+            Closure::<dyn FnMut(_)>::new(move |event: KeyboardEvent| {
+                if event.repeat() {
+                    return;
+                }
+                app.borrow_mut().on_keydown(&event);
+            })
+        };
+        document
+            .add_event_listener_with_callback("keydown", cb.as_ref().unchecked_ref())
+            .unwrap();
+        cb.forget();
+
+        // document.addEventListener("keyup")
+        let cb = {
+            let app = app.clone();
+
+            Closure::<dyn FnMut(_)>::new(move |event: KeyboardEvent| {
+                app.borrow_mut().on_keyup(&event);
+            })
+        };
+        document
+            .add_event_listener_with_callback("keyup", cb.as_ref().unchecked_ref())
+            .unwrap();
+        cb.forget();
     }
 }
 

@@ -10,4 +10,4 @@ console_error_panic_hook = "0.1.7"
 log = "0.4.20"
 wasm-bindgen = "0.2.87"
 wasm-logger = "0.2.0"
-web-sys = { version = "0.3.64", features = ["CanvasRenderingContext2d", "HtmlCanvasElement", "Document", "Window"] }
+web-sys = { version = "0.3.64", features = ["Window", "Document", "HtmlCanvasElement", "CanvasRenderingContext2d", "KeyboardEvent"] }
