@@ -15,9 +15,19 @@ fn basics() -> (Window, Document, HtmlElement) {
     (window, document, body)
 }
 
+fn context2d(canvas: &HtmlCanvasElement) -> CanvasRenderingContext2d {
+    canvas
+        .get_context("2d")
+        .unwrap()
+        .unwrap()
+        .dyn_into::<CanvasRenderingContext2d>()
+        .unwrap()
+}
+
 #[derive(Debug)]
 struct App {
-    canvas: HtmlCanvasElement,
+    front_canvas: HtmlCanvasElement,
+    back_canvas: HtmlCanvasElement,
     canvas_w: u32,
     canvas_h: u32,
     interval_id: Option<i32>,
@@ -28,19 +38,26 @@ impl App {
     fn new(canvas_w: u32, canvas_h: u32) -> Self {
         let (_window, document, body) = basics();
 
-        let canvas = document.create_element("canvas").unwrap();
-        canvas
-            .set_attribute("width", &canvas_w.to_string())
-            .unwrap();
-        canvas
-            .set_attribute("height", &canvas_h.to_string())
-            .unwrap();
-        let canvas = canvas.dyn_into::<HtmlCanvasElement>().unwrap();
+        let create_canvas = || {
+            let canvas = document.create_element("canvas").unwrap();
+            canvas
+                .set_attribute("width", &canvas_w.to_string())
+                .unwrap();
+            canvas
+                .set_attribute("height", &canvas_h.to_string())
+                .unwrap();
 
-        body.append_child(canvas.as_ref()).unwrap();
+            canvas.dyn_into::<HtmlCanvasElement>().unwrap()
+        };
+
+        let front_canvas = create_canvas();
+        let back_canvas = create_canvas();
+
+        body.append_child(&front_canvas).unwrap();
 
         App {
-            canvas,
+            front_canvas,
+            back_canvas,
             canvas_w,
             canvas_h,
             interval_id: None,
@@ -48,17 +65,15 @@ impl App {
         }
     }
 
-    fn context2d(&self) -> CanvasRenderingContext2d {
-        self.canvas
-            .get_context("2d")
-            .unwrap()
-            .unwrap()
-            .dyn_into::<CanvasRenderingContext2d>()
-            .unwrap()
+    fn flip(&self) {
+        let context = context2d(&self.front_canvas);
+        context
+            .draw_image_with_html_canvas_element(&self.back_canvas, 0.0, 0.0)
+            .unwrap();
     }
 
     fn on_interval(&mut self) {
-        let context = self.context2d();
+        let context = context2d(&self.back_canvas);
 
         let t = self.frame as u8;
         let color = format!("#{0:>02x}{0:>02x}{0:>02x}", t);
@@ -66,6 +81,8 @@ impl App {
         context.fill_rect(0.0, 0.0, self.canvas_w as f64, self.canvas_h as f64);
 
         self.frame += 1;
+
+        self.flip();
     }
 
     fn on_keydown(&mut self, event: &KeyboardEvent) {
