@@ -4,9 +4,6 @@ use web_sys::{
     CanvasRenderingContext2d, Document, HtmlCanvasElement, HtmlElement, KeyboardEvent, Window,
 };
 
-const CANVAS_W: u32 = 640;
-const CANVAS_H: u32 = 480;
-
 fn basics() -> (Window, Document, HtmlElement) {
     let window = web_sys::window().unwrap();
     let document = window.document().unwrap();
@@ -25,7 +22,7 @@ fn context2d(canvas: &HtmlCanvasElement) -> CanvasRenderingContext2d {
 }
 
 #[derive(Debug)]
-struct App {
+pub struct BaseSys {
     front_canvas: HtmlCanvasElement,
     back_canvas: HtmlCanvasElement,
     canvas_w: u32,
@@ -34,8 +31,8 @@ struct App {
     frame: u64,
 }
 
-impl App {
-    fn new(canvas_w: u32, canvas_h: u32) -> Self {
+impl BaseSys {
+    pub fn new(canvas_w: u32, canvas_h: u32) -> Self {
         let (_window, document, body) = basics();
 
         let create_canvas = || {
@@ -55,7 +52,7 @@ impl App {
 
         body.append_child(&front_canvas).unwrap();
 
-        App {
+        Self {
             front_canvas,
             back_canvas,
             canvas_w,
@@ -93,7 +90,7 @@ impl App {
         log::info!("Key up: {}", event.code());
     }
 
-    fn start(self) {
+    pub fn start(self) {
         assert!(self.interval_id.is_none());
 
         let app = Rc::new(RefCell::new(self));
@@ -146,9 +143,4 @@ impl App {
             .unwrap();
         cb.forget();
     }
-}
-
-pub fn app_main() {
-    let app = App::new(CANVAS_W, CANVAS_H);
-    app.start();
 }
