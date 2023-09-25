@@ -1,7 +1,8 @@
 use std::{cell::RefCell, rc::Rc};
 use wasm_bindgen::{prelude::*, JsCast};
 use web_sys::{
-    CanvasRenderingContext2d, Document, HtmlCanvasElement, HtmlElement, KeyboardEvent, Window,
+    CanvasRenderingContext2d, Document, HtmlCanvasElement, HtmlElement, KeyboardEvent, MouseEvent,
+    Window,
 };
 
 fn basics() -> (Window, Document, HtmlElement) {
@@ -83,6 +84,9 @@ impl BaseSys {
     }
 
     fn on_keydown(&mut self, event: &KeyboardEvent) {
+        if event.repeat() {
+            return;
+        }
         log::info!("Key down: {}", event.code());
     }
 
@@ -90,12 +94,48 @@ impl BaseSys {
         log::info!("Key up: {}", event.code());
     }
 
+    fn on_mousedown(&mut self, event: &MouseEvent) {
+        log::info!(
+            "Mouse down: {} ({}, {})",
+            event.button(),
+            event.client_x(),
+            event.client_y()
+        );
+    }
+
+    fn on_mouseup(&mut self, event: &MouseEvent) {
+        log::info!(
+            "Mouse up: {} ({}, {})",
+            event.button(),
+            event.client_x(),
+            event.client_y()
+        );
+    }
+
+    fn on_click(&mut self, event: &MouseEvent) {
+        log::info!(
+            "Mouse click: {} ({}, {})",
+            event.button(),
+            event.client_x(),
+            event.client_y()
+        );
+    }
+
+    fn on_dblclick(&mut self, event: &MouseEvent) {
+        log::info!(
+            "Mouse dblclick: {} ({}, {})",
+            event.button(),
+            event.client_x(),
+            event.client_y()
+        );
+    }
+
     pub fn start(self) {
         assert!(self.interval_id.is_none());
 
         let app = Rc::new(RefCell::new(self));
 
-        let (window, document, _) = basics();
+        let (window, _document, _body) = basics();
 
         // window.setInterval()
         let cb: Closure<dyn FnMut()> = {
@@ -117,15 +157,12 @@ impl BaseSys {
         // document.addEventListener("keydown")
         let cb = {
             let app = app.clone();
-
             Closure::<dyn FnMut(_)>::new(move |event: KeyboardEvent| {
-                if event.repeat() {
-                    return;
-                }
                 app.borrow_mut().on_keydown(&event);
             })
         };
-        document
+        app.borrow()
+            .front_canvas
             .add_event_listener_with_callback("keydown", cb.as_ref().unchecked_ref())
             .unwrap();
         cb.forget();
@@ -133,13 +170,65 @@ impl BaseSys {
         // document.addEventListener("keyup")
         let cb = {
             let app = app.clone();
-
             Closure::<dyn FnMut(_)>::new(move |event: KeyboardEvent| {
                 app.borrow_mut().on_keyup(&event);
             })
         };
-        document
+        app.borrow()
+            .front_canvas
             .add_event_listener_with_callback("keyup", cb.as_ref().unchecked_ref())
+            .unwrap();
+        cb.forget();
+
+        // document.addEventListener("mouseup")
+        let cb = {
+            let app = app.clone();
+            Closure::<dyn FnMut(_)>::new(move |event: MouseEvent| {
+                app.borrow_mut().on_mousedown(&event);
+            })
+        };
+        app.borrow()
+            .front_canvas
+            .add_event_listener_with_callback("mousedown", cb.as_ref().unchecked_ref())
+            .unwrap();
+        cb.forget();
+
+        // document.addEventListener("mousedown")
+        let cb = {
+            let app = app.clone();
+            Closure::<dyn FnMut(_)>::new(move |event: MouseEvent| {
+                app.borrow_mut().on_mouseup(&event);
+            })
+        };
+        app.borrow()
+            .front_canvas
+            .add_event_listener_with_callback("mouseup", cb.as_ref().unchecked_ref())
+            .unwrap();
+        cb.forget();
+
+        // document.addEventListener("click")
+        let cb = {
+            let app = app.clone();
+            Closure::<dyn FnMut(_)>::new(move |event: MouseEvent| {
+                app.borrow_mut().on_click(&event);
+            })
+        };
+        app.borrow()
+            .front_canvas
+            .add_event_listener_with_callback("click", cb.as_ref().unchecked_ref())
+            .unwrap();
+        cb.forget();
+
+        // document.addEventListener("mousedown")
+        let cb = {
+            let app = app.clone();
+            Closure::<dyn FnMut(_)>::new(move |event: MouseEvent| {
+                app.borrow_mut().on_dblclick(&event);
+            })
+        };
+        app.borrow()
+            .front_canvas
+            .add_event_listener_with_callback("dblclick", cb.as_ref().unchecked_ref())
             .unwrap();
         cb.forget();
     }
