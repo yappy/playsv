@@ -1,13 +1,14 @@
 use std::{collections::HashMap, rc::Rc};
 
 use crate::basesys::{App, BaseSys};
+use anyhow::{bail, Result};
 use getopts::{Matches, Options};
 use web_sys::CanvasRenderingContext2d;
 
 const CANVAS_W: u32 = 640;
 const CANVAS_H: u32 = 480;
 
-type DbgCmdFunc = dyn Fn(&mut MainApp, Matches);
+type DbgCmdFunc = dyn Fn(&mut MainApp, Matches) -> Result<()>;
 struct DbgCmd {
     opts: Options,
     func: Rc<Box<DbgCmdFunc>>,
@@ -26,7 +27,7 @@ impl MainApp {
         Self { frame: 0, dbg_cmds }
     }
 
-    fn exec_dbg_cmd(&mut self, cmd: &str, args: &str) {
+    fn exec_dbg_cmd(&mut self, cmd: &str, args: &str) -> Result<()> {
         let func;
         let matches;
         if let Some(v) = self.dbg_cmds.get(cmd) {
@@ -36,15 +37,14 @@ impl MainApp {
                     matches = m;
                 }
                 Err(e) => {
-                    log::error!("{e}");
-                    return;
+                    bail!(e);
                 }
             }
         } else {
-            log::error!("Command not found: {cmd}");
-            return;
+            bail!("Command not found: {cmd}");
         }
-        func(self, matches);
+
+        func(self, matches)
     }
 
     fn create_dbg_cmds() -> HashMap<&'static str, DbgCmd> {
@@ -73,10 +73,14 @@ impl MainApp {
         dbg_cmds
     }
 
-    fn dbg_help(&mut self, _args: Matches) {
+    fn dbg_help(&mut self, _args: Matches) -> Result<()> {
         log::debug!("HELP OK");
+        Ok(())
     }
-    fn dbg_echo(&mut self, _args: Matches) {}
+    fn dbg_echo(&mut self, _args: Matches) -> Result<()> {
+        log::debug!("ECHO OK");
+        Ok(())
+    }
 }
 
 impl App for MainApp {
@@ -99,8 +103,14 @@ impl App for MainApp {
         } else {
             (cmdline, "")
         };
+
         log::info!("cmd: {cmd}, args: {args}");
-        self.exec_dbg_cmd(cmd, args);
+        match self.exec_dbg_cmd(cmd, args) {
+            Ok(()) => {}
+            Err(e) => {
+                log::error!("{:?}", e)
+            }
+        }
     }
 }
 
