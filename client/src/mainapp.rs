@@ -8,9 +8,9 @@ use web_sys::CanvasRenderingContext2d;
 const CANVAS_W: u32 = 640;
 const CANVAS_H: u32 = 480;
 
-type DbgCmdFunc = dyn Fn(&mut MainApp, Matches) -> Result<()>;
+type DbgCmdFunc = dyn Fn(&mut MainApp, &Options, Matches) -> Result<()>;
 struct DbgCmd {
-    opts: Options,
+    opts: Rc<Options>,
     func: Rc<Box<DbgCmdFunc>>,
 }
 
@@ -28,12 +28,12 @@ impl MainApp {
     }
 
     fn exec_dbg_cmd(&mut self, cmd: &str, args: &str) -> Result<()> {
-        let func;
-        let matches;
+        let (func, opts, matches);
         if let Some(v) = self.dbg_cmds.get(cmd) {
             match v.opts.parse(args.split_ascii_whitespace()) {
                 Ok(m) => {
                     func = v.func.clone();
+                    opts = v.opts.clone();
                     matches = m;
                 }
                 Err(e) => {
@@ -44,7 +44,7 @@ impl MainApp {
             bail!("Command not found: {cmd}");
         }
 
-        func(self, matches)
+        func(self, &opts, matches)
     }
 
     fn create_dbg_cmds() -> HashMap<&'static str, DbgCmd> {
@@ -55,7 +55,7 @@ impl MainApp {
         dbg_cmds.insert(
             "help",
             DbgCmd {
-                opts,
+                opts: Rc::new(opts),
                 func: Rc::new(Box::new(Self::dbg_help)),
             },
         );
@@ -65,7 +65,7 @@ impl MainApp {
         dbg_cmds.insert(
             "echo",
             DbgCmd {
-                opts,
+                opts: Rc::new(opts),
                 func: Rc::new(Box::new(Self::dbg_echo)),
             },
         );
@@ -73,12 +73,47 @@ impl MainApp {
         dbg_cmds
     }
 
-    fn dbg_help(&mut self, _args: Matches) -> Result<()> {
-        log::debug!("HELP OK");
+    fn dbg_help(&mut self, opts: &Options, args: Matches) -> Result<()> {
+        if args.opt_present("h") {
+            let brief = "Print help for COMMAND.\nhelp [options] [COMMAND...]";
+            log::debug!("{}", opts.usage(brief));
+            return Ok(());
+        }
+
+        if args.free.is_empty() {
+            let mut buf = String::new();
+            for (&k, v) in self.dbg_cmds.iter() {
+                buf += "\n";
+                buf += &v.opts.short_usage(k);
+            }
+            log::debug!("Command List{buf}");
+        } else {
+            for cmd in args.free.iter() {
+                let (func, opts, matches);
+                if let Some(v) = self.dbg_cmds.get(cmd.as_str()) {
+                    func = v.func.clone();
+                    opts = v.opts.clone();
+                    matches = v.opts.parse(["-h"])?;
+                } else {
+                    bail!("Command not found: {cmd}");
+                };
+                func(self, &opts, matches)?;
+            }
+        }
+
         Ok(())
     }
-    fn dbg_echo(&mut self, _args: Matches) -> Result<()> {
-        log::debug!("ECHO OK");
+    fn dbg_echo(&mut self, opts: &Options, args: Matches) -> Result<()> {
+        if args.opt_present("h") {
+            let brief = "Print TEXT.\nhelp [options] [TEXT...]";
+            log::debug!("{}", opts.usage(brief));
+            return Ok(());
+        }
+
+        for text in args.free.iter() {
+            log::debug!("{text}");
+        }
+
         Ok(())
     }
 }
@@ -104,7 +139,6 @@ impl App for MainApp {
             (cmdline, "")
         };
 
-        log::info!("cmd: {cmd}, args: {args}");
         match self.exec_dbg_cmd(cmd, args) {
             Ok(()) => {}
             Err(e) => {
