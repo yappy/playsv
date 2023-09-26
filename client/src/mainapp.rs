@@ -1,5 +1,3 @@
-use std::collections::VecDeque;
-
 use crate::basesys::{App, BaseSys};
 use web_sys::CanvasRenderingContext2d;
 
@@ -8,18 +6,11 @@ const CANVAS_H: u32 = 480;
 
 struct MainApp {
     frame: u64,
-
-    cmd_buffer: VecDeque<String>,
-    cmd_index: usize,
 }
 
 impl MainApp {
     fn new() -> Self {
-        Self {
-            frame: 0,
-            cmd_buffer: VecDeque::from(["".to_string()]),
-            cmd_index: 0,
-        }
+        Self { frame: 0 }
     }
 }
 
@@ -36,41 +27,14 @@ impl App for MainApp {
         context.fill_rect(0.0, 0.0, width as f64, height as f64);
     }
 
-    fn on_debug_keydown(
-        &mut self,
-        event: &web_sys::KeyboardEvent,
-        input: &web_sys::HtmlInputElement,
-    ) {
-        let key = event.key();
-        let text = input.value();
-        match key.as_str() {
-            "Enter" => {
-                log::info!("Command: {text}");
-
-                self.cmd_buffer.remove(self.cmd_index);
-                self.cmd_buffer.push_front(text);
-                self.cmd_buffer.push_front("".to_string());
-                self.cmd_index = 0;
-                input.set_value("");
-            }
-            "Down" | "ArrowDown" => {
-                self.cmd_buffer[self.cmd_index] = text;
-                let new_index = self.cmd_index.saturating_sub(1);
-                let new_index = new_index.clamp(0, self.cmd_buffer.len() - 1);
-                self.cmd_index = new_index;
-                let new_text = self.cmd_buffer[new_index].as_str();
-                input.set_value(new_text);
-            }
-            "Up" | "ArrowUp" => {
-                self.cmd_buffer[self.cmd_index] = text;
-                let new_index = self.cmd_index.saturating_add(1);
-                let new_index = new_index.clamp(0, self.cmd_buffer.len() - 1);
-                self.cmd_index = new_index;
-                let new_text = self.cmd_buffer[new_index].as_str();
-                input.set_value(new_text);
-            }
-            _ => {}
-        }
+    fn on_debug_command(&mut self, cmdline: &str) {
+        let idx = cmdline.find(' ');
+        let (cmd, args) = if let Some(idx) = idx {
+            (&cmdline[..idx], &cmdline[idx + 1..])
+        } else {
+            (cmdline, "")
+        };
+        log::info!("cmd: {cmd}, args: {args}");
     }
 }
 

@@ -1,4 +1,4 @@
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, collections::VecDeque, rc::Rc};
 use wasm_bindgen::{prelude::*, JsCast};
 use web_sys::{
     CanvasRenderingContext2d, Document, HtmlCanvasElement, HtmlElement, HtmlInputElement,
@@ -33,7 +33,7 @@ pub trait App {
     fn on_mouse_up(&mut self, _event: &MouseEvent) {}
     fn on_mouse_click(&mut self, _event: &MouseEvent) {}
 
-    fn on_debug_keydown(&mut self, _event: &KeyboardEvent, _input: &HtmlInputElement) {}
+    fn on_debug_command(&mut self, _cmdline: &str) {}
 }
 
 #[derive(Debug)]
@@ -45,6 +45,9 @@ pub struct BaseSys<T> {
     canvas_w: u32,
     canvas_h: u32,
     interval_id: Option<i32>,
+
+    cmd_buffer: VecDeque<String>,
+    cmd_index: usize,
 }
 
 impl<T: App + 'static> BaseSys<T> {
@@ -92,6 +95,8 @@ impl<T: App + 'static> BaseSys<T> {
             canvas_w,
             canvas_h,
             interval_id: None,
+            cmd_buffer: VecDeque::from(["".to_string()]),
+            cmd_index: 0,
         }
     }
 
@@ -157,7 +162,37 @@ impl<T: App + 'static> BaseSys<T> {
     }
 
     fn on_debug_keydown(&mut self, event: &KeyboardEvent) {
-        self.app.on_debug_keydown(event, &self.debug_cmd);
+        let key = event.key();
+        let text = self.debug_cmd.value();
+
+        match key.as_str() {
+            "Enter" => {
+                self.cmd_buffer.remove(self.cmd_index);
+                self.cmd_buffer.push_front(text.clone());
+                self.cmd_buffer.push_front("".to_string());
+                self.cmd_index = 0;
+                self.debug_cmd.set_value("");
+
+                self.app.on_debug_command(&text);
+            }
+            "Down" | "ArrowDown" => {
+                self.cmd_buffer[self.cmd_index] = text;
+                let new_index = self.cmd_index.saturating_sub(1);
+                let new_index = new_index.clamp(0, self.cmd_buffer.len() - 1);
+                self.cmd_index = new_index;
+                let new_text = self.cmd_buffer[new_index].as_str();
+                self.debug_cmd.set_value(new_text);
+            }
+            "Up" | "ArrowUp" => {
+                self.cmd_buffer[self.cmd_index] = text;
+                let new_index = self.cmd_index.saturating_add(1);
+                let new_index = new_index.clamp(0, self.cmd_buffer.len() - 1);
+                self.cmd_index = new_index;
+                let new_text = self.cmd_buffer[new_index].as_str();
+                self.debug_cmd.set_value(new_text);
+            }
+            _ => {}
+        }
     }
 
     pub fn start(self) {
