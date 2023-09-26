@@ -1,8 +1,8 @@
 use std::{cell::RefCell, rc::Rc};
 use wasm_bindgen::{prelude::*, JsCast};
 use web_sys::{
-    CanvasRenderingContext2d, Document, HtmlCanvasElement, HtmlElement, KeyboardEvent, MouseEvent,
-    Window,
+    CanvasRenderingContext2d, Document, HtmlCanvasElement, HtmlElement, HtmlInputElement,
+    KeyboardEvent, MouseEvent, Window,
 };
 
 fn basics() -> (Window, Document, HtmlElement) {
@@ -22,30 +22,45 @@ fn context2d(canvas: &HtmlCanvasElement) -> CanvasRenderingContext2d {
         .unwrap()
 }
 
+pub trait App {
+    fn frame(&mut self) {}
+    fn render(&mut self, _context: &CanvasRenderingContext2d, _width: u32, _height: u32) {}
+
+    fn init(&mut self) {}
+    fn on_key_down(&mut self, _event: &KeyboardEvent) {}
+    fn on_key_up(&mut self, _event: &KeyboardEvent) {}
+    fn on_mouse_down(&mut self, _event: &MouseEvent) {}
+    fn on_mouse_up(&mut self, _event: &MouseEvent) {}
+    fn on_mouse_click(&mut self, _event: &MouseEvent) {}
+
+    fn on_debug_keydown(&mut self, _event: &KeyboardEvent, _input: &HtmlInputElement) {}
+}
+
 #[derive(Debug)]
-pub struct BaseSys {
+pub struct BaseSys<T> {
+    app: T,
     front_canvas: HtmlCanvasElement,
     back_canvas: HtmlCanvasElement,
+    debug_cmd: HtmlInputElement,
     canvas_w: u32,
     canvas_h: u32,
     interval_id: Option<i32>,
-    frame: u64,
 }
 
-impl BaseSys {
-    pub fn new(canvas_w: u32, canvas_h: u32) -> Self {
+impl<T: App + 'static> BaseSys<T> {
+    pub fn new(app: T, canvas_w: u32, canvas_h: u32) -> Self {
         let (_window, document, body) = basics();
 
         let create_canvas = || {
-            let canvas = document.create_element("canvas").unwrap();
-            canvas
-                .set_attribute("width", &canvas_w.to_string())
+            let canvas = document
+                .create_element("canvas")
+                .unwrap()
+                .dyn_into::<HtmlCanvasElement>()
                 .unwrap();
-            canvas
-                .set_attribute("height", &canvas_h.to_string())
-                .unwrap();
+            canvas.set_width(canvas_w);
+            canvas.set_height(canvas_h);
 
-            canvas.dyn_into::<HtmlCanvasElement>().unwrap()
+            canvas
         };
 
         let front_canvas = create_canvas();
@@ -53,17 +68,35 @@ impl BaseSys {
 
         body.append_child(&front_canvas).unwrap();
 
+        let debug_area = document.create_element("div").unwrap();
+        let debug_label = document.create_element("label").unwrap();
+        debug_label.set_text_content(Some("Command: "));
+        let debug_cmd = document
+            .create_element("input")
+            .unwrap()
+            .dyn_into::<HtmlInputElement>()
+            .unwrap();
+        debug_cmd.set_type("input");
+        debug_cmd.set_size(50);
+
+        debug_area.append_child(&debug_label).unwrap();
+        debug_area.append_child(&debug_cmd).unwrap();
+
+        body.append_child(&debug_area).unwrap();
+
         Self {
+            app,
             front_canvas,
             back_canvas,
+            debug_cmd,
             canvas_w,
             canvas_h,
             interval_id: None,
-            frame: 0,
         }
     }
 
     fn flip(&self) {
+        // Copy back => front
         let context = context2d(&self.front_canvas);
         context
             .draw_image_with_html_canvas_element(&self.back_canvas, 0.0, 0.0)
@@ -73,13 +106,10 @@ impl BaseSys {
     fn on_interval(&mut self) {
         let context = context2d(&self.back_canvas);
 
-        let t = self.frame as u8;
-        let color = format!("#{0:>02x}{0:>02x}{0:>02x}", t);
-        context.set_fill_style(&color.into());
-        context.fill_rect(0.0, 0.0, self.canvas_w as f64, self.canvas_h as f64);
+        self.app.frame();
+        self.app.render(&context, self.canvas_w, self.canvas_h);
 
-        self.frame += 1;
-
+        // TODO animationFrame would be better
         self.flip();
     }
 
@@ -88,10 +118,12 @@ impl BaseSys {
             return;
         }
         log::info!("Key down: {}", event.code());
+        self.app.on_key_down(event);
     }
 
     fn on_keyup(&mut self, event: &KeyboardEvent) {
         log::info!("Key up: {}", event.code());
+        self.app.on_key_up(event);
     }
 
     fn on_mousedown(&mut self, event: &MouseEvent) {
@@ -101,6 +133,7 @@ impl BaseSys {
             event.client_x(),
             event.client_y()
         );
+        self.app.on_mouse_down(event);
     }
 
     fn on_mouseup(&mut self, event: &MouseEvent) {
@@ -110,6 +143,7 @@ impl BaseSys {
             event.client_x(),
             event.client_y()
         );
+        self.app.on_mouse_up(event);
     }
 
     fn on_click(&mut self, event: &MouseEvent) {
@@ -119,29 +153,25 @@ impl BaseSys {
             event.client_x(),
             event.client_y()
         );
+        self.app.on_mouse_click(event);
     }
 
-    fn on_dblclick(&mut self, event: &MouseEvent) {
-        log::info!(
-            "Mouse dblclick: {} ({}, {})",
-            event.button(),
-            event.client_x(),
-            event.client_y()
-        );
+    fn on_debug_keydown(&mut self, event: &KeyboardEvent) {
+        self.app.on_debug_keydown(event, &self.debug_cmd);
     }
 
     pub fn start(self) {
         assert!(self.interval_id.is_none());
 
-        let app = Rc::new(RefCell::new(self));
+        let basesys = Rc::new(RefCell::new(self));
 
         let (window, _document, _body) = basics();
 
         // window.setInterval()
         let cb: Closure<dyn FnMut()> = {
-            let app = app.clone();
+            let basesys = basesys.clone();
             Closure::new(move || {
-                app.borrow_mut().on_interval();
+                basesys.borrow_mut().on_interval();
             })
         };
         let id = window
@@ -151,85 +181,93 @@ impl BaseSys {
             )
             .unwrap();
         cb.forget();
-        app.borrow_mut().interval_id = Some(id);
+        basesys.borrow_mut().interval_id = Some(id);
         log::info!("setInterval: {id}");
 
-        // document.addEventListener("keydown")
+        // front_canvas.addEventListener("keydown")
         let cb = {
-            let app = app.clone();
+            let basesys = basesys.clone();
             Closure::<dyn FnMut(_)>::new(move |event: KeyboardEvent| {
-                app.borrow_mut().on_keydown(&event);
+                basesys.borrow_mut().on_keydown(&event);
             })
         };
-        app.borrow()
+        basesys
+            .borrow()
             .front_canvas
             .add_event_listener_with_callback("keydown", cb.as_ref().unchecked_ref())
             .unwrap();
         cb.forget();
 
-        // document.addEventListener("keyup")
+        // front_canvas.addEventListener("keyup")
         let cb = {
-            let app = app.clone();
+            let basesys = basesys.clone();
             Closure::<dyn FnMut(_)>::new(move |event: KeyboardEvent| {
-                app.borrow_mut().on_keyup(&event);
+                basesys.borrow_mut().on_keyup(&event);
             })
         };
-        app.borrow()
+        basesys
+            .borrow()
             .front_canvas
             .add_event_listener_with_callback("keyup", cb.as_ref().unchecked_ref())
             .unwrap();
         cb.forget();
 
-        // document.addEventListener("mouseup")
+        // front_canvas.addEventListener("mouseup")
         let cb = {
-            let app = app.clone();
+            let basesys = basesys.clone();
             Closure::<dyn FnMut(_)>::new(move |event: MouseEvent| {
-                app.borrow_mut().on_mousedown(&event);
+                basesys.borrow_mut().on_mousedown(&event);
             })
         };
-        app.borrow()
+        basesys
+            .borrow()
             .front_canvas
             .add_event_listener_with_callback("mousedown", cb.as_ref().unchecked_ref())
             .unwrap();
         cb.forget();
 
-        // document.addEventListener("mousedown")
+        // front_canvas.addEventListener("mousedown")
         let cb = {
-            let app = app.clone();
+            let basesys = basesys.clone();
             Closure::<dyn FnMut(_)>::new(move |event: MouseEvent| {
-                app.borrow_mut().on_mouseup(&event);
+                basesys.borrow_mut().on_mouseup(&event);
             })
         };
-        app.borrow()
+        basesys
+            .borrow()
             .front_canvas
             .add_event_listener_with_callback("mouseup", cb.as_ref().unchecked_ref())
             .unwrap();
         cb.forget();
 
-        // document.addEventListener("click")
+        // front_canvas.addEventListener("click")
         let cb = {
-            let app = app.clone();
+            let basesys = basesys.clone();
             Closure::<dyn FnMut(_)>::new(move |event: MouseEvent| {
-                app.borrow_mut().on_click(&event);
+                basesys.borrow_mut().on_click(&event);
             })
         };
-        app.borrow()
+        basesys
+            .borrow()
             .front_canvas
             .add_event_listener_with_callback("click", cb.as_ref().unchecked_ref())
             .unwrap();
         cb.forget();
 
-        // document.addEventListener("mousedown")
+        // debug_cmd.addEventListener("keydown")
         let cb = {
-            let app = app.clone();
-            Closure::<dyn FnMut(_)>::new(move |event: MouseEvent| {
-                app.borrow_mut().on_dblclick(&event);
+            let basesys = basesys.clone();
+            Closure::<dyn FnMut(_)>::new(move |event: KeyboardEvent| {
+                basesys.borrow_mut().on_debug_keydown(&event);
             })
         };
-        app.borrow()
-            .front_canvas
-            .add_event_listener_with_callback("dblclick", cb.as_ref().unchecked_ref())
+        basesys
+            .borrow()
+            .debug_cmd
+            .add_event_listener_with_callback("keydown", cb.as_ref().unchecked_ref())
             .unwrap();
         cb.forget();
+
+        basesys.borrow_mut().app.init();
     }
 }
