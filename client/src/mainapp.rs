@@ -63,10 +63,10 @@ impl MainApp {
         let mut opts = Options::new();
         opts.optflag("h", "help", "Print help");
         dbg_cmds.insert(
-            "echo",
+            "frame",
             DbgCmd {
                 opts: Rc::new(opts),
-                func: Rc::new(Box::new(Self::dbg_echo)),
+                func: Rc::new(Box::new(Self::dbg_frame)),
             },
         );
 
@@ -103,15 +103,19 @@ impl MainApp {
 
         Ok(())
     }
-    fn dbg_echo(&mut self, opts: &Options, args: Matches) -> Result<()> {
+    fn dbg_frame(&mut self, opts: &Options, args: Matches) -> Result<()> {
         if args.opt_present("h") {
-            let brief = "Print TEXT.\nhelp [options] [TEXT...]";
+            let brief = "Get/Set frame count.\nframe [options] [SETVALUE]";
             log::debug!("{}", opts.usage(brief));
             return Ok(());
         }
 
-        for text in args.free.iter() {
-            log::debug!("{text}");
+        if !args.free.is_empty() {
+            let value = args.free[0].parse()?;
+            self.frame = value;
+            log::debug!("Set: {}", value);
+        } else {
+            log::debug!("{}", self.frame);
         }
 
         Ok(())
