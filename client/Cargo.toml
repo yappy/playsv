@@ -25,4 +25,5 @@ web-sys = { version = "0.3.64", features = [
 
 [build-dependencies]
 anyhow = "1.0.75"
+base64 = "0.21.4"
 glob = "0.3.1"
