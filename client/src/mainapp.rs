@@ -1,4 +1,5 @@
 use crate::{
+    asset,
     basesys::{App, BaseSys},
     net::PollingHttp,
 };
@@ -79,6 +80,15 @@ impl MainApp {
         let mut opts = Options::new();
         opts.optflag("h", "help", "Print help");
         dbg_cmds.insert(
+            "file",
+            DbgCmd {
+                opts: Rc::new(opts),
+                func: Rc::new(Box::new(Self::dbg_file)),
+            },
+        );
+        let mut opts = Options::new();
+        opts.optflag("h", "help", "Print help");
+        dbg_cmds.insert(
             "http",
             DbgCmd {
                 opts: Rc::new(opts),
@@ -133,6 +143,25 @@ impl MainApp {
             log::debug!("Set: {}", value);
         } else {
             log::debug!("{}", self.frame);
+        }
+
+        Ok(())
+    }
+
+    fn dbg_file(&mut self, opts: &Options, args: Matches) -> Result<()> {
+        if args.opt_present("h") {
+            let brief = "Show files.\nfiles [options]";
+            log::debug!("{}", opts.usage(brief));
+            return Ok(());
+        }
+
+        if args.free.is_empty() {
+            log::debug!("All files:\n{}", asset::get_file_list().join("\n"));
+        } else {
+            for name in args.free.iter() {
+                let base64 = asset::read_file(&name)?;
+                log::debug!("{name} {}\n{}", base64.len(), base64)
+            }
         }
 
         Ok(())
