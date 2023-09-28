@@ -34,3 +34,9 @@ trunk serve
 ```sh
 trunk build --release
 ```
+
+## Debug build.rs
+
+```sh
+cargo build -vv
+```

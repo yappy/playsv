@@ -27,6 +27,7 @@ dependencies = [
  "anyhow",
  "console_error_panic_hook",
  "getopts",
+ "glob",
  "log",
  "wasm-bindgen",
  "wasm-logger",
@@ -51,6 +52,12 @@ checksum = "14dbbfd5c71d70241ecf9e6f13737f7b5ce823821063188d7e46c41d371eebd5"
 dependencies = [
  "unicode-width",
 ]
+
+[[package]]
+name = "glob"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d2fabcfbdc87f4758337ca535fb41a6d701b65693ce38287d856d1674551ec9b"
 
 [[package]]
 name = "js-sys"

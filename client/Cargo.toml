@@ -22,3 +22,7 @@ web-sys = { version = "0.3.64", features = [
     "MouseEvent",
     'XmlHttpRequest'
 ]}
+
+[build-dependencies]
+anyhow = "1.0.75"
+glob = "0.3.1"

@@ -1,3 +1,4 @@
+mod asset;
 mod basesys;
 mod mainapp;
 mod net;
