@@ -12,4 +12,13 @@ getopts = "0.2.21"
 log = "0.4.20"
 wasm-bindgen = "0.2.87"
 wasm-logger = "0.2.0"
-web-sys = { version = "0.3.64", features = ["Window", "Document", "HtmlCanvasElement", "CanvasRenderingContext2d", "HtmlInputElement", "KeyboardEvent", "MouseEvent"] }
+web-sys = { version = "0.3.64", features = [
+    "Window",
+    "Document",
+    "HtmlCanvasElement",
+    "CanvasRenderingContext2d",
+    "HtmlInputElement",
+    "KeyboardEvent",
+    "MouseEvent",
+    'XmlHttpRequest'
+]}

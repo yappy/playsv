@@ -1,8 +1,10 @@
-use std::{collections::HashMap, rc::Rc};
-
-use crate::basesys::{App, BaseSys};
+use crate::{
+    basesys::{App, BaseSys},
+    net::PollingHttp,
+};
 use anyhow::{bail, Result};
 use getopts::{Matches, Options};
+use std::{collections::HashMap, rc::Rc};
 use web_sys::CanvasRenderingContext2d;
 
 const CANVAS_W: u32 = 640;
@@ -15,6 +17,7 @@ struct DbgCmd {
 }
 
 struct MainApp {
+    http: PollingHttp,
     frame: u64,
 
     dbg_cmds: HashMap<&'static str, DbgCmd>,
@@ -22,9 +25,14 @@ struct MainApp {
 
 impl MainApp {
     fn new() -> Self {
+        let http = PollingHttp::new();
         let dbg_cmds = Self::create_dbg_cmds();
 
-        Self { frame: 0, dbg_cmds }
+        Self {
+            http,
+            frame: 0,
+            dbg_cmds,
+        }
     }
 
     fn exec_dbg_cmd(&mut self, cmd: &str, args: &str) -> Result<()> {
@@ -59,7 +67,6 @@ impl MainApp {
                 func: Rc::new(Box::new(Self::dbg_help)),
             },
         );
-
         let mut opts = Options::new();
         opts.optflag("h", "help", "Print help");
         dbg_cmds.insert(
@@ -67,6 +74,15 @@ impl MainApp {
             DbgCmd {
                 opts: Rc::new(opts),
                 func: Rc::new(Box::new(Self::dbg_frame)),
+            },
+        );
+        let mut opts = Options::new();
+        opts.optflag("h", "help", "Print help");
+        dbg_cmds.insert(
+            "http",
+            DbgCmd {
+                opts: Rc::new(opts),
+                func: Rc::new(Box::new(Self::dbg_http)),
             },
         );
 
@@ -103,6 +119,7 @@ impl MainApp {
 
         Ok(())
     }
+
     fn dbg_frame(&mut self, opts: &Options, args: Matches) -> Result<()> {
         if args.opt_present("h") {
             let brief = "Get/Set frame count.\nframe [options] [SETVALUE]";
@@ -120,10 +137,30 @@ impl MainApp {
 
         Ok(())
     }
+
+    fn dbg_http(&mut self, opts: &Options, args: Matches) -> Result<()> {
+        if args.opt_present("h") {
+            let brief = "HTTP request.\nhttp [options] [URL]";
+            log::debug!("{}", opts.usage(brief));
+            return Ok(());
+        }
+
+        let url = args
+            .free
+            .get(0)
+            .map_or("http://127.0.0.1:8080/", |s| s.as_str());
+        log::debug!("HTTP: {url}");
+        self.http.request(url, |result| {
+            log::debug!("{:?}", result);
+        });
+
+        Ok(())
+    }
 }
 
 impl App for MainApp {
     fn frame(&mut self) {
+        self.http.poll();
         self.frame += 1;
     }
 

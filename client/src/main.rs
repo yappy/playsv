@@ -1,5 +1,6 @@
 mod basesys;
 mod mainapp;
+mod net;
 
 fn init() {
     console_error_panic_hook::set_once();
