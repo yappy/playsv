@@ -6,7 +6,7 @@ use crate::{
 use anyhow::{bail, Result};
 use getopts::{Matches, Options};
 use std::{collections::HashMap, rc::Rc};
-use web_sys::CanvasRenderingContext2d;
+use web_sys::{CanvasRenderingContext2d, HtmlImageElement};
 
 const CANVAS_W: u32 = 640;
 const CANVAS_H: u32 = 480;
@@ -20,18 +20,27 @@ struct DbgCmd {
 struct MainApp {
     http: PollingHttp,
     frame: u64,
+    testimg: HtmlImageElement,
 
     dbg_cmds: HashMap<&'static str, DbgCmd>,
 }
 
 impl MainApp {
     fn new() -> Self {
-        let http = PollingHttp::new();
         let dbg_cmds = Self::create_dbg_cmds();
+
+        let http = PollingHttp::new();
+        let testimg = HtmlImageElement::new().unwrap();
+        let testdata = format!(
+            "data:image/gif;base64,{}",
+            asset::read_file("manzu0/p_ms1_0.gif").unwrap()
+        );
+        testimg.set_src(&testdata);
 
         Self {
             http,
             frame: 0,
+            testimg,
             dbg_cmds,
         }
     }
@@ -199,6 +208,8 @@ impl App for MainApp {
         let color = format!("#{0:>02x}{0:>02x}{0:>02x}", t);
         context.set_fill_style(&color.into());
         context.fill_rect(0.0, 0.0, width as f64, height as f64);
+
+        context.draw_image_with_html_image_element(&self.testimg, 320.0, 240.0).unwrap();
     }
 
     fn on_debug_command(&mut self, cmdline: &str) {
