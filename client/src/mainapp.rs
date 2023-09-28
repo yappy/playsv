@@ -44,7 +44,44 @@ impl MainApp {
             dbg_cmds,
         }
     }
+}
 
+impl App for MainApp {
+    fn frame(&mut self) {
+        self.http.poll();
+        self.frame += 1;
+    }
+
+    fn render(&mut self, context: &CanvasRenderingContext2d, width: u32, height: u32) {
+        let t = self.frame as u8;
+
+        let color = format!("#{0:>02x}{0:>02x}{0:>02x}", t);
+        context.set_fill_style(&color.into());
+        context.fill_rect(0.0, 0.0, width as f64, height as f64);
+
+        context
+            .draw_image_with_html_image_element(&self.testimg, 320.0, 240.0)
+            .unwrap();
+    }
+
+    fn on_debug_command(&mut self, cmdline: &str) {
+        let idx = cmdline.find(' ');
+        let (cmd, args) = if let Some(idx) = idx {
+            (&cmdline[..idx], &cmdline[idx + 1..])
+        } else {
+            (cmdline, "")
+        };
+
+        match self.exec_dbg_cmd(cmd, args) {
+            Ok(()) => {}
+            Err(e) => {
+                log::error!("{:?}", e)
+            }
+        }
+    }
+}
+
+impl MainApp {
     fn exec_dbg_cmd(&mut self, cmd: &str, args: &str) -> Result<()> {
         let (func, opts, matches);
         if let Some(v) = self.dbg_cmds.get(cmd) {
@@ -65,45 +102,41 @@ impl MainApp {
         func(self, &opts, matches)
     }
 
+    fn insert_dbg_cmd<F>(
+        map: &mut HashMap<&str, DbgCmd>,
+        name: &'static str,
+        opts: Options,
+        func: F,
+    ) where
+        F: Fn(&mut MainApp, &Options, Matches) -> Result<()> + 'static,
+    {
+        map.insert(
+            name,
+            DbgCmd {
+                opts: Rc::new(opts),
+                func: Rc::new(Box::new(func)),
+            },
+        );
+    }
+
     fn create_dbg_cmds() -> HashMap<&'static str, DbgCmd> {
         let mut dbg_cmds = HashMap::new();
 
         let mut opts = Options::new();
         opts.optflag("h", "help", "Print help");
-        dbg_cmds.insert(
-            "help",
-            DbgCmd {
-                opts: Rc::new(opts),
-                func: Rc::new(Box::new(Self::dbg_help)),
-            },
-        );
+        Self::insert_dbg_cmd(&mut dbg_cmds, "help", opts, Self::dbg_help);
+
         let mut opts = Options::new();
         opts.optflag("h", "help", "Print help");
-        dbg_cmds.insert(
-            "frame",
-            DbgCmd {
-                opts: Rc::new(opts),
-                func: Rc::new(Box::new(Self::dbg_frame)),
-            },
-        );
+        Self::insert_dbg_cmd(&mut dbg_cmds, "frame", opts, Self::dbg_frame);
+
         let mut opts = Options::new();
         opts.optflag("h", "help", "Print help");
-        dbg_cmds.insert(
-            "file",
-            DbgCmd {
-                opts: Rc::new(opts),
-                func: Rc::new(Box::new(Self::dbg_file)),
-            },
-        );
+        Self::insert_dbg_cmd(&mut dbg_cmds, "file", opts, Self::dbg_file);
+
         let mut opts = Options::new();
         opts.optflag("h", "help", "Print help");
-        dbg_cmds.insert(
-            "http",
-            DbgCmd {
-                opts: Rc::new(opts),
-                func: Rc::new(Box::new(Self::dbg_http)),
-            },
-        );
+        Self::insert_dbg_cmd(&mut dbg_cmds, "http", opts, Self::dbg_http);
 
         dbg_cmds
     }
@@ -193,39 +226,6 @@ impl MainApp {
         });
 
         Ok(())
-    }
-}
-
-impl App for MainApp {
-    fn frame(&mut self) {
-        self.http.poll();
-        self.frame += 1;
-    }
-
-    fn render(&mut self, context: &CanvasRenderingContext2d, width: u32, height: u32) {
-        let t = self.frame as u8;
-
-        let color = format!("#{0:>02x}{0:>02x}{0:>02x}", t);
-        context.set_fill_style(&color.into());
-        context.fill_rect(0.0, 0.0, width as f64, height as f64);
-
-        context.draw_image_with_html_image_element(&self.testimg, 320.0, 240.0).unwrap();
-    }
-
-    fn on_debug_command(&mut self, cmdline: &str) {
-        let idx = cmdline.find(' ');
-        let (cmd, args) = if let Some(idx) = idx {
-            (&cmdline[..idx], &cmdline[idx + 1..])
-        } else {
-            (cmdline, "")
-        };
-
-        match self.exec_dbg_cmd(cmd, args) {
-            Ok(()) => {}
-            Err(e) => {
-                log::error!("{:?}", e)
-            }
-        }
     }
 }
 
