@@ -1,13 +1,12 @@
 mod mj;
 mod mjsys;
 
-use git_version::git_version;
 use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
-use serde::{Serialize, Deserialize};
+use git_version::git_version;
+use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::RwLock;
-
 
 // from build system
 const GIT_VERSION: &str = git_version!();
@@ -32,7 +31,7 @@ struct ErrorMsg {
 }
 
 fn error_json(message: String) -> String {
-    let obj = ErrorMsg{message};
+    let obj = ErrorMsg { message };
 
     serde_json::to_string(&obj).unwrap()
 }
@@ -51,7 +50,9 @@ async fn info() -> impl Responder {
     };
     let body = serde_json::to_string(&info).unwrap();
 
-    HttpResponse::Ok().content_type("application/json").body(body)
+    HttpResponse::Ok()
+        .content_type("application/json")
+        .body(body)
 }
 
 #[get("/")]
@@ -90,16 +91,21 @@ async fn get_games(data: web::Data<AppState>) -> impl Responder {
     {
         // rlock
         let games = data.games.read().unwrap();
-        let list = games.iter().map(
-            |(id, (_game, comment))|
-                GetGameResultElement{id: *id, comment: comment.clone()}
-            ).collect();
-        result = GetGameResult{games: list};
+        let list = games
+            .iter()
+            .map(|(id, (_game, comment))| GetGameResultElement {
+                id: *id,
+                comment: comment.clone(),
+            })
+            .collect();
+        result = GetGameResult { games: list };
         // unlock
     }
     let body = serde_json::to_string(&result).unwrap();
 
-    HttpResponse::Ok().content_type("application/json").body(body)
+    HttpResponse::Ok()
+        .content_type("application/json")
+        .body(body)
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -124,9 +130,10 @@ async fn post_games(data: web::Data<AppState>, param: web::Json<PostGameParam>) 
     let new_game = match mj::Game::new() {
         Ok(game) => game,
         Err(msg) => {
-            return HttpResponse::BadRequest().content_type("application/json")
+            return HttpResponse::BadRequest()
+                .content_type("application/json")
                 .body(error_json(msg));
-        },
+        }
     };
 
     let id;
@@ -139,10 +146,12 @@ async fn post_games(data: web::Data<AppState>, param: web::Json<PostGameParam>) 
         // unlock
     }
 
-    let result = PostGameResult{id};
+    let result = PostGameResult { id };
     let body = serde_json::to_string(&result).unwrap();
 
-    HttpResponse::Ok().content_type("application/json").body(body)
+    HttpResponse::Ok()
+        .content_type("application/json")
+        .body(body)
 }
 
 #[get("/games/{id}/{player}")]
@@ -160,17 +169,17 @@ async fn get_games_id(data: web::Data<AppState>, path: web::Path<(u64, u32)>) ->
                     return HttpResponse::Ok()
                         .content_type("application/json")
                         .body(result)
-                },
+                }
                 Err(msg) => {
                     return HttpResponse::BadRequest()
                         .content_type("application/json")
                         .body(error_json(msg))
-                },
+                }
             }
-        }
-        else {
-            return HttpResponse::BadRequest().content_type("application/json")
-                .body(error_json("Invalid id".to_string()))
+        } else {
+            return HttpResponse::BadRequest()
+                .content_type("application/json")
+                .body(error_json("Invalid id".to_string()));
         }
         // unlock
     }
@@ -195,13 +204,14 @@ async fn main() -> std::io::Result<()> {
             .service(post_games)
             .service(get_games_id)
     })
-    .bind("127.0.0.1:8080")?
+    .bind("127.0.0.1:8888")?
     .run()
     .await
 }
 
 fn simple_html(title: &str, body: &str) -> String {
-    format!(r#"<!DOCTYPE html>
+    format!(
+        r#"<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8"/>
@@ -212,5 +222,6 @@ fn simple_html(title: &str, body: &str) -> String {
 </body>
 </html>
 "#,
-        title, body)
+        title, body
+    )
 }

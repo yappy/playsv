@@ -1,7 +1,7 @@
 use super::mjsys;
-use std::sync::RwLock;
 use rand::seq::SliceRandom;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
+use std::sync::RwLock;
 
 /*
 Game State Machine
@@ -14,10 +14,10 @@ NAP: Non Active Player
 ** Trash one -> 2
 ** Kan (open/blind) -> 1
 ** Tsumo -> 3
-* Any NAP can do nothing.
+* Any NAPs can do nothing.
 
 2. After trash
-* NAP can:
+* NAPs can:
 ** Chi -> 1
 ** Pon -> 1
 ** Kan -> 1
@@ -31,9 +31,7 @@ NAP: Non Active Player
 */
 
 // each game is protected by indivisual rwlock
-pub struct Game {
-    state: RwLock<GameState>,
-}
+pub struct Game(RwLock<GameState>);
 
 // main game status control data
 #[derive(Debug)]
@@ -122,14 +120,14 @@ impl Game {
         // TODO: pass rule config
         match state.init() {
             // After this, it is necessary to take a lock for GameState access
-            Ok(()) => Ok(Game { state: RwLock::new(state) }),
+            Ok(()) => Ok(Game(RwLock::new(state))),
             Err(msg) => Err(msg),
         }
     }
 
     pub fn get_view(&self, player: u32) -> Result<String, String> {
         // read lock and (common, internal) <- state
-        let GameState { common, internal } = &*self.state.read().unwrap();
+        let GameState { common, internal } = &*self.0.read().unwrap();
         if player >= common.player_count {
             return Err("Invalid player: {}".to_string());
         }
@@ -150,9 +148,8 @@ impl Game {
     fn convert_to_local_state(
         common: &CommonState,
         internal: &InternalState,
-        player: u32)
-        -> LocalState
-    {
+        player: u32,
+    ) -> LocalState {
         let mut local: LocalState = Default::default();
 
         for i in 0..4 {
@@ -197,7 +194,7 @@ impl Game {
 
     #[allow(dead_code)]
     pub fn action(&mut self) {
-        let mut _state = self.state.write().unwrap();
+        let mut _state = self.0.write().unwrap();
         // ...
     }
 }
@@ -322,8 +319,7 @@ impl GameState {
             assert!(internal.draws[p] == None);
         }
         // draw
-        internal.draws[common.turn as usize] = Some(
-            internal.yama.pop().unwrap());
+        internal.draws[common.turn as usize] = Some(internal.yama.pop().unwrap());
 
         // go to new state
         common.phase = GamePhase::WaitAction;
