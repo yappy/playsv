@@ -1,7 +1,8 @@
 mod mj;
 mod mjsys;
 
-use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder};
+use actix_cors::Cors;
+use actix_web::{get, http, post, web, App, HttpResponse, HttpServer, Responder};
 use git_version::git_version;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -196,7 +197,16 @@ async fn main() -> std::io::Result<()> {
     // pass a function as App builder
     // move app_state into closure
     HttpServer::new(move || {
+        let cors = Cors::default()
+            .allowed_origin("http://127.0.0.1:8080")
+            .allowed_methods(vec!["GET", "POST"])
+            .allowed_headers(vec![http::header::AUTHORIZATION, http::header::ACCEPT])
+            .allowed_header(http::header::CONTENT_TYPE)
+            .supports_credentials()
+            .max_age(3600);
+
         App::new()
+            .wrap(cors)
             .app_data(app_state.clone())
             .service(index)
             .service(info)
