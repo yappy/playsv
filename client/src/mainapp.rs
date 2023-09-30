@@ -201,7 +201,7 @@ impl MainApp {
             log::debug!("All files:\n{}", asset::get_file_list().join("\n"));
         } else {
             for name in args.free.iter() {
-                let base64 = asset::read_file(&name)?;
+                let base64 = asset::read_file(name)?;
                 log::debug!("{name} {}\n{}", base64.len(), base64)
             }
         }

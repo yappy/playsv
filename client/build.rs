@@ -34,7 +34,7 @@ fn process_assets(out_dir: &Path) -> Result<()> {
     }
 
     asset_rs += RS_FOOTER;
-    fs::write(&dst_path, &asset_rs)?;
+    fs::write(dst_path, &asset_rs)?;
     println!("{}", out_dir.to_string_lossy());
 
     Ok(())

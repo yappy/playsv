@@ -109,10 +109,7 @@ impl Game {
                     local.hands_str[ius].push(mjsys::human_readable_string(code));
                 }
                 // draw
-                local.draws[ius] = match internal.draws[pus] {
-                    Some(hai) => hai,
-                    None => -1,
-                };
+                local.draws[ius] = internal.draws[pus].unwrap_or(-1);
                 local.draws_str[ius] = match internal.draws[pus] {
                     Some(hai) => mjsys::human_readable_string(hai as u16),
                     None => "".to_string(),
@@ -256,7 +253,7 @@ impl GameState {
         // all player must not have draw hai
         // yama.len() must be > 0
         for p in 0..common.player_count as usize {
-            assert!(internal.draws[p] == None);
+            assert!(internal.draws[p].is_none());
         }
         // draw
         internal.draws[common.turn as usize] = Some(internal.yama.pop().unwrap());
