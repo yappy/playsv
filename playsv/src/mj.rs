@@ -1,6 +1,6 @@
-use super::mjsys;
+use crate::jsif;
+use crate::mjsys;
 use rand::seq::SliceRandom;
-use serde::{Deserialize, Serialize};
 use std::sync::RwLock;
 
 /*
@@ -37,58 +37,9 @@ pub struct Game(RwLock<GameState>);
 #[derive(Debug)]
 struct GameState {
     // common view to all players as is
-    common: CommonState,
+    common: jsif::CommonState,
     // hidden or player-dependent view
     internal: InternalState,
-}
-
-// publish to each player as json
-#[derive(Debug, Serialize, Deserialize)]
-struct LocalView {
-    common: CommonState,
-    local: LocalState,
-}
-
-// the same view from all players
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-struct CommonState {
-    // constant
-    player_count: u32,
-    round_max: u32,
-    // active player index and phase
-    turn: u32,
-    phase: GamePhase,
-    // wind 0..round_max, parent 0..player_count, hon
-    wind: u32,
-    parent: u32,
-    hon: u32,
-    // TODO
-    // dora
-}
-
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-enum GamePhase {
-    WaitAction,
-    WaitReaction,
-    ShowResult,
-}
-
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-enum Action {
-    // Active player
-    Discard(i32),
-    Tsumo,
-    // TODO: param
-    BlindKan,
-    SmallKan,
-
-    // Non-active player
-    Skip,
-    Ron,
-    // TODO: param
-    Chi,
-    Pon,
-    BigKan,
 }
 
 // player-dependent data (managed by system)
@@ -100,18 +51,7 @@ struct InternalState {
     points: Vec<i32>,
     hands: Vec<Vec<i32>>,
     draws: Vec<Option<i32>>,
-    actions: Vec<Vec<Action>>,
-}
-
-// player-dependent data view
-#[derive(Debug, Default, Serialize, Deserialize)]
-struct LocalState {
-    points: [i32; 4],
-    hands: [Vec<i32>; 4],
-    hands_str: [Vec<String>; 4],
-    draws: [i32; 4],
-    draws_str: [String; 4],
-    actions: Vec<Action>,
+    actions: Vec<Vec<jsif::Action>>,
 }
 
 impl Game {
@@ -133,9 +73,9 @@ impl Game {
         }
 
         // result struct for json output
-        let result = LocalView {
+        let result = jsif::LocalView {
             // copy common field
-            common: *common,
+            common: common.clone(),
             // convert from internal
             local: Self::convert_to_local_state(common, internal, player),
         };
@@ -146,11 +86,11 @@ impl Game {
     }
 
     fn convert_to_local_state(
-        common: &CommonState,
+        common: &jsif::CommonState,
         internal: &InternalState,
         player: u32,
-    ) -> LocalState {
-        let mut local: LocalState = Default::default();
+    ) -> jsif::LocalState {
+        let mut local: jsif::LocalState = Default::default();
 
         for i in 0..4 {
             // i = global player index
@@ -202,11 +142,11 @@ impl Game {
 impl GameState {
     fn new() -> GameState {
         GameState {
-            common: CommonState {
+            common: jsif::CommonState {
                 player_count: 0,
                 round_max: 0,
                 turn: 0,
-                phase: GamePhase::WaitAction,
+                phase: jsif::GamePhase::WaitAction,
                 wind: 0,
                 parent: 0,
                 hon: 0,
@@ -322,7 +262,7 @@ impl GameState {
         internal.draws[common.turn as usize] = Some(internal.yama.pop().unwrap());
 
         // go to new state
-        common.phase = GamePhase::WaitAction;
+        common.phase = jsif::GamePhase::WaitAction;
         for alist in &mut internal.actions {
             alist.clear();
         }
@@ -330,7 +270,7 @@ impl GameState {
         let ap_actions = &mut internal.actions[common.turn as usize];
         let ap_hand = &internal.hands[common.turn as usize];
         for (i, _hai) in ap_hand.iter().enumerate() {
-            ap_actions.push(Action::Discard(i as i32));
+            ap_actions.push(jsif::Action::Discard(i as i32));
         }
     }
 }

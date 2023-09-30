@@ -1,7 +1,8 @@
 mod asset;
 mod basesys;
-mod mainapp;
 mod net;
+mod mainapp;
+mod jsif;
 
 fn init() {
     console_error_panic_hook::set_once();
