@@ -23,6 +23,9 @@ struct DbgCmd {
 struct MainApp {
     http: PollingHttp,
     frame: u64,
+    fps: f64,
+    fps_start: f64,
+    fps_count: u64,
     server_info: Rc<RefCell<Option<String>>>,
     testimg: HtmlImageElement,
 
@@ -44,6 +47,9 @@ impl MainApp {
         Self {
             http,
             frame: 0,
+            fps: 0.0,
+            fps_start: 0.0,
+            fps_count: 0,
             server_info: Rc::new(RefCell::new(None)),
             testimg,
             dbg_cmds,
@@ -63,6 +69,16 @@ impl App for MainApp {
     }
 
     fn frame(&mut self) {
+        // ms
+        let now = web_sys::window().unwrap().performance().unwrap().now();
+        let elapsed = now - self.fps_start;
+        self.fps_count += 1;
+        if elapsed > 1000.0 {
+            self.fps = self.fps_count as f64 / (elapsed / 1000.0);
+            self.fps_count = 0;
+            self.fps_start = now;
+        }
+
         self.http.poll();
         self.frame += 1;
     }
@@ -83,6 +99,10 @@ impl App for MainApp {
             "Getting server info..."
         };
         context.fill_text(infostr, 10.0, 10.0).unwrap();
+
+        context
+            .fill_text(&format!("{:0>5.2}", self.fps), width as f64 - 30.0, 10.0)
+            .unwrap();
 
         context
             .draw_image_with_html_image_element(&self.testimg, 320.0, 240.0)
