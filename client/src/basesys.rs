@@ -1,9 +1,23 @@
-use std::{cell::RefCell, collections::VecDeque, rc::Rc, sync::atomic::AtomicBool};
+use std::{cell::RefCell, collections::VecDeque, panic, rc::Rc};
 use wasm_bindgen::{prelude::*, JsCast};
 use web_sys::{
     CanvasRenderingContext2d, Document, HtmlCanvasElement, HtmlElement, HtmlInputElement,
     KeyboardEvent, MouseEvent, Window,
 };
+
+// This should be safe because js event handlers will be
+// executed serially on a single thread.
+pub static mut PANIC_FLAG: bool = false;
+
+fn is_panic() -> bool {
+    unsafe { PANIC_FLAG }
+}
+
+fn set_panic() {
+    unsafe {
+        PANIC_FLAG = true;
+    }
+}
 
 fn basics() -> (Window, Document, HtmlElement) {
     let window = web_sys::window().unwrap();
@@ -44,7 +58,6 @@ pub struct BaseSys<T> {
     debug_cmd: HtmlInputElement,
     canvas_w: u32,
     canvas_h: u32,
-    interval_id: Option<i32>,
 
     cmd_buffer: VecDeque<String>,
     cmd_index: usize,
@@ -94,7 +107,6 @@ impl<T: App + 'static> BaseSys<T> {
             debug_cmd,
             canvas_w,
             canvas_h,
-            interval_id: None,
             cmd_buffer: VecDeque::from(["".to_string()]),
             cmd_index: 0,
         }
@@ -112,6 +124,7 @@ impl<T: App + 'static> BaseSys<T> {
         let context = context2d(&self.back_canvas);
 
         self.app.frame();
+
         context.save();
         self.app.render(&context, self.canvas_w, self.canvas_h);
         context.restore();
@@ -198,8 +211,6 @@ impl<T: App + 'static> BaseSys<T> {
     }
 
     pub fn start(self) {
-        assert!(self.interval_id.is_none());
-
         let basesys = Rc::new(RefCell::new(self));
 
         let (window, _document, _body) = basics();
@@ -208,24 +219,26 @@ impl<T: App + 'static> BaseSys<T> {
         let cb: Closure<dyn FnMut()> = {
             let basesys = basesys.clone();
             Closure::new(move || {
-                basesys.borrow_mut().on_interval();
+                if !is_panic() {
+                    basesys.borrow_mut().on_interval();
+                }
             })
         };
-        let id = window
+        let _id = window
             .set_interval_with_callback_and_timeout_and_arguments_0(
                 cb.as_ref().unchecked_ref(),
                 1000 / 60,
             )
             .unwrap();
         cb.forget();
-        basesys.borrow_mut().interval_id = Some(id);
-        log::info!("setInterval: {id}");
 
         // front_canvas.addEventListener("keydown")
         let cb = {
             let basesys = basesys.clone();
             Closure::<dyn FnMut(_)>::new(move |event: KeyboardEvent| {
-                basesys.borrow_mut().on_keydown(&event);
+                if !is_panic() {
+                    basesys.borrow_mut().on_keydown(&event);
+                }
             })
         };
         basesys
@@ -239,7 +252,9 @@ impl<T: App + 'static> BaseSys<T> {
         let cb = {
             let basesys = basesys.clone();
             Closure::<dyn FnMut(_)>::new(move |event: KeyboardEvent| {
-                basesys.borrow_mut().on_keyup(&event);
+                if !is_panic() {
+                    basesys.borrow_mut().on_keyup(&event);
+                }
             })
         };
         basesys
@@ -253,7 +268,9 @@ impl<T: App + 'static> BaseSys<T> {
         let cb = {
             let basesys = basesys.clone();
             Closure::<dyn FnMut(_)>::new(move |event: MouseEvent| {
-                basesys.borrow_mut().on_mousedown(&event);
+                if !is_panic() {
+                    basesys.borrow_mut().on_mousedown(&event);
+                }
             })
         };
         basesys
@@ -267,7 +284,9 @@ impl<T: App + 'static> BaseSys<T> {
         let cb = {
             let basesys = basesys.clone();
             Closure::<dyn FnMut(_)>::new(move |event: MouseEvent| {
-                basesys.borrow_mut().on_mouseup(&event);
+                if !is_panic() {
+                    basesys.borrow_mut().on_mouseup(&event);
+                }
             })
         };
         basesys
@@ -281,7 +300,9 @@ impl<T: App + 'static> BaseSys<T> {
         let cb = {
             let basesys = basesys.clone();
             Closure::<dyn FnMut(_)>::new(move |event: MouseEvent| {
-                basesys.borrow_mut().on_click(&event);
+                if !is_panic() {
+                    basesys.borrow_mut().on_click(&event);
+                }
             })
         };
         basesys
@@ -295,7 +316,9 @@ impl<T: App + 'static> BaseSys<T> {
         let cb = {
             let basesys = basesys.clone();
             Closure::<dyn FnMut(_)>::new(move |event: KeyboardEvent| {
-                basesys.borrow_mut().on_debug_keydown(&event);
+                if !is_panic() {
+                    basesys.borrow_mut().on_debug_keydown(&event);
+                }
             })
         };
         basesys
@@ -304,6 +327,13 @@ impl<T: App + 'static> BaseSys<T> {
             .add_event_listener_with_callback("keydown", cb.as_ref().unchecked_ref())
             .unwrap();
         cb.forget();
+
+        // Install a new panic handler
+        let old = panic::take_hook();
+        panic::set_hook(Box::new(move |info| {
+            old(info);
+            set_panic();
+        }));
 
         basesys.borrow_mut().app.init();
     }
