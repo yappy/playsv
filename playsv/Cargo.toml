@@ -13,9 +13,3 @@ serde_json = "1.0.107"
 rand = "0.8.5"
 actix-web = "4.4.0"
 actix-cors = "0.6.4"
-
-[profile.dev]
-panic = "abort"
-
-[profile.release]
-panic = "abort"

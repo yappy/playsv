@@ -6,16 +6,10 @@
 
 <https://www.rust-lang.org/ja/tools/install>
 
-## Update Tools
+## Build + Run (native)
 
 ```sh
-rustup update
-```
-
-## Build + Run
-
-```sh
-cd [project_dir]
+cd playsv
 cargo build [--release]
 cargo run [--release]
 ```
@@ -27,16 +21,46 @@ cargo install --locked trunk
 ```
 
 ```sh
+cd client
 trunk build
 trunk serve
 ```
 
 ```sh
 trunk build --release
+trunk serve --release
 ```
 
 ## Debug build.rs
 
 ```sh
 cargo build -vv
+```
+
+## Update Tools
+
+```sh
+rustup self update
+rustup update
+```
+
+## Cargo.toml edit tool
+
+```sh
+cargo install cargo-edit
+```
+
+```sh
+cargo add PKGNAME
+# add to Cargo.toml and show features below...
+cargo add PKGNAME --features a,b,c
+cargo rm PKGNAME
+```
+
+## Update dependencies
+
+```sh
+cargo update
+# cargo-edit
+cargo upgrade
 ```
