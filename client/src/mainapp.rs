@@ -1,10 +1,10 @@
 use crate::{
     asset,
     basesys::{App, BaseSys},
-    jsif, mjsys,
     net::PollingHttp,
 };
 use anyhow::{bail, Result};
+use common::{jsif, mjsys};
 use getopts::{Matches, Options};
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 use web_sys::{CanvasRenderingContext2d, HtmlImageElement};

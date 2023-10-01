@@ -1,9 +1,8 @@
-mod jsif;
 mod mjgame;
-mod mjsys;
 
 use actix_cors::Cors;
 use actix_web::{get, http, post, web, App, HttpResponse, HttpServer, Responder};
+use common::jsif;
 use git_version::git_version;
 use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -113,7 +112,10 @@ async fn post_room(
 }
 
 #[get("/api/room/{id}/{player}")]
-async fn get_room_id_player(data: web::Data<AppState>, path: web::Path<(u64, u32)>) -> impl Responder {
+async fn get_room_id_player(
+    data: web::Data<AppState>,
+    path: web::Path<(u64, u32)>,
+) -> impl Responder {
     let (id, player) = path.into_inner();
 
     {

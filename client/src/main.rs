@@ -1,8 +1,6 @@
 mod asset;
 mod basesys;
-mod jsif;
 mod mainapp;
-mod mjsys;
 mod net;
 
 fn init() {

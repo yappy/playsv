@@ -1,5 +1,4 @@
-use crate::jsif;
-use crate::mjsys;
+use common::{jsif, mjsys};
 use rand::seq::SliceRandom;
 use std::sync::RwLock;
 
