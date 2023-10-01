@@ -22,8 +22,8 @@ struct DbgCmd {
 
 enum State {
     Init,
-    SelectRoom(Option<jsif::RoomList>),
-    Main(Option<jsif::LocalView>),
+    SelectRoom(Option<Box<jsif::RoomList>>),
+    Main(Option<Box<jsif::LocalView>>),
 }
 
 struct MainApp {
@@ -55,6 +55,7 @@ impl MainApp {
             let is_zu = kind == 3;
             let maxnum = if is_zu { 7 } else { 9 };
 
+            #[allow(clippy::needless_range_loop)]
             for num in 1..=maxnum {
                 let fname = if !is_zu {
                     format!("hai/p_{}{}_0.gif", kind_table[kind], num)
@@ -64,7 +65,7 @@ impl MainApp {
                 let img = HtmlImageElement::new().unwrap();
                 let testdata = format!(
                     "data:image/gif;base64,{}",
-                    asset::read_file(&fname).expect(&format!("File not found: {fname}"))
+                    asset::read_file(&fname).unwrap_or_else(|e| panic!("{e}"))
                 );
                 img.set_src(&testdata);
 
@@ -104,7 +105,7 @@ impl App for MainApp {
         self.http.get(&url, move |result| {
             let rooms: jsif::RoomList = serde_json::from_str(result.expect("HTTP request error"))
                 .expect("Json parse error");
-            *dest.borrow_mut() = State::SelectRoom(Some(rooms));
+            *dest.borrow_mut() = State::SelectRoom(Some(Box::new(rooms)));
         });
         *self.state.borrow_mut() = State::SelectRoom(None);
     }
@@ -185,7 +186,7 @@ impl MainApp {
     fn render_select_room(
         &self,
         context: &CanvasRenderingContext2d,
-        rooms: &Option<jsif::RoomList>,
+        rooms: &Option<Box<jsif::RoomList>>,
     ) {
         if rooms.is_none() {
             return;
@@ -199,7 +200,11 @@ impl MainApp {
             .unwrap();
     }
 
-    fn render_game_main(&self, context: &CanvasRenderingContext2d, view: &Option<jsif::LocalView>) {
+    fn render_game_main(
+        &self,
+        context: &CanvasRenderingContext2d,
+        view: &Option<Box<jsif::LocalView>>,
+    ) {
         if view.is_none() {
             return;
         }
@@ -408,7 +413,7 @@ impl MainApp {
             if let Ok(json) = result {
                 if let Ok(view) = serde_json::from_str::<jsif::LocalView>(json) {
                     log::debug!("{:?}", view);
-                    *state.borrow_mut() = State::Main(Some(view));
+                    *state.borrow_mut() = State::Main(Some(Box::new(view)));
                 }
             }
         });

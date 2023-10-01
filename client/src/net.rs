@@ -69,7 +69,7 @@ impl PollingHttp {
     {
         let request = XmlHttpRequest::new().unwrap();
         request.open(method, url).unwrap();
-        if data == "" {
+        if data.is_empty() {
             request.send().unwrap();
         } else {
             request
