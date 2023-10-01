@@ -1,5 +1,5 @@
 mod jsif;
-mod mj;
+mod mjgame;
 mod mjsys;
 
 use actix_cors::Cors;
@@ -20,7 +20,7 @@ struct AppState {
     // next game room id to be created
     next_id: AtomicU64,
     // (id -> Game, comment) sorted list
-    rooms: RwLock<BTreeMap<u64, (mj::Game, String)>>,
+    rooms: RwLock<BTreeMap<u64, (mjgame::Game, String)>>,
 }
 
 /// /info
@@ -86,7 +86,7 @@ async fn post_room(
     }
 
     // create a new game state
-    let new_game = match mj::Game::new() {
+    let new_game = match mjgame::Game::new() {
         Ok(game) => game,
         Err(msg) => {
             return HttpResponse::BadRequest().json(jsif::ErrorMsg::new(msg));
