@@ -103,12 +103,12 @@ impl Game {
                 local.hands[ius] = internal.hands[pus].clone();
                 for hai in &*local.hands[ius] {
                     let code = *hai as u16;
-                    local.hands_str[ius].push(mjsys::human_readable_string(code));
+                    local.hands_str[ius].push(mjsys::to_human_readable_string(code).unwrap());
                 }
                 // draw
                 local.draws[ius] = internal.draws[pus].unwrap_or(-1);
                 local.draws_str[ius] = match internal.draws[pus] {
-                    Some(hai) => mjsys::human_readable_string(hai as u16),
+                    Some(hai) => mjsys::to_human_readable_string(hai as u16).unwrap(),
                     None => "".to_string(),
                 };
                 // action
@@ -203,12 +203,12 @@ impl GameState {
                 for kind in 0..3 {
                     // 1-9
                     for num in 1..=9 {
-                        yama_tmp.push(mjsys::encode(kind, num, 0) as i32);
+                        yama_tmp.push(mjsys::encode(kind, num, 0).unwrap() as i32);
                     }
                 }
                 // zu: 3
                 for num in 1..=7 {
-                    yama_tmp.push(mjsys::encode(3, num, 0) as i32);
+                    yama_tmp.push(mjsys::encode(3, num, 0).unwrap() as i32);
                 }
             }
             // thread_local cryptographically secure PRNG
