@@ -4,6 +4,9 @@ members = [
     "common",
     "playsv",
 ]
+exclude = [
+    "client"
+]
 
 [profile.dev]
 panic = "abort"
