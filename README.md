@@ -9,7 +9,8 @@
 ## Build + Run (native)
 
 ```sh
-cd playsv
+cd REPO_ROOT
+# the workspace contains common/ and playsv/
 cargo build [--release]
 cargo run [--release]
 ```
