@@ -82,7 +82,7 @@ pub fn from_human_readable_string(src: &str) -> Result<Vec<u16>> {
                 let num = b as u16 - '0' as u16;
                 tmp.push(num);
             }
-            _=> {
+            _ => {
                 // error if not mpsz
                 let kind = char_to_kind(c)?;
                 for &num in tmp.iter() {
@@ -92,9 +92,14 @@ pub fn from_human_readable_string(src: &str) -> Result<Vec<u16>> {
                     let pai = encode(kind, num, 0).unwrap();
                     result.push(pai);
                 }
+                tmp.clear();
             }
         }
     }
+    if !tmp.is_empty() {
+        bail!("Ended with a number");
+    }
+    result.sort();
 
     Ok(result)
 }
@@ -102,21 +107,42 @@ pub fn from_human_readable_string(src: &str) -> Result<Vec<u16>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use anyhow::Result;
 
     #[test]
-    fn encode_decode() -> Result<()> {
+    fn encode_decode() {
         for k in 0..4 {
             for n in 1..10 {
                 if k == 3 && n > 7 {
                     continue;
                 }
-                let enc = encode(k, n, 0)?;
-                let (kk, nn, _oo) = decode(enc)?;
+                let enc = encode(k, n, 0).unwrap();
+                let (kk, nn, _oo) = decode(enc).unwrap();
                 assert_eq!(k, kk);
                 assert_eq!(n, nn);
             }
         }
-        Ok(())
+    }
+
+    #[test]
+    fn parse_human_readable() {
+        let hand = from_human_readable_string("123456789m123456789p123456789s1234567z").unwrap();
+
+        for k in 0..4 {
+            for n in 1..10 {
+                if k == 3 && n > 7 {
+                    continue;
+                }
+                assert!(hand.binary_search(&encode(k, n, 0).unwrap()).is_ok());
+            }
+        }
+
+        let hand = from_human_readable_string("あm");
+        assert!(hand.is_err());
+        let hand = from_human_readable_string("0m");
+        assert!(hand.is_err());
+        let hand = from_human_readable_string("0z");
+        assert!(hand.is_err());
+        let hand = from_human_readable_string("12345");
+        assert!(hand.is_err());
     }
 }
