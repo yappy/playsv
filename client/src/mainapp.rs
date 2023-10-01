@@ -1,7 +1,7 @@
 use crate::{
     asset,
     basesys::{App, BaseSys},
-    jsif,
+    jsif, mjsys,
     net::PollingHttp,
 };
 use anyhow::{bail, Result};
@@ -23,7 +23,7 @@ struct DbgCmd {
 enum State {
     Init,
     SelectRoom(Option<jsif::RoomList>),
-    //Main(Option<jsif::LocalView>),
+    Main(Option<jsif::LocalView>),
 }
 
 struct MainApp {
@@ -35,7 +35,9 @@ struct MainApp {
     fps_start: f64,
     fps_count: u64,
     server_info: Rc<RefCell<Option<String>>>,
-    testimg: HtmlImageElement,
+
+    // [kind][num]
+    img_hai: [Vec<HtmlImageElement>; 4],
 
     dbg_cmds: HashMap<&'static str, DbgCmd>,
 }
@@ -45,12 +47,30 @@ impl MainApp {
         let dbg_cmds = Self::create_dbg_cmds();
 
         let http = PollingHttp::new();
-        let testimg = HtmlImageElement::new().unwrap();
-        let testdata = format!(
-            "data:image/gif;base64,{}",
-            asset::read_file("manzu0/p_ms1_0.gif").unwrap()
-        );
-        testimg.set_src(&testdata);
+
+        let kind_table = ["ms", "ps", "ss"];
+        let zu_table = ["", "ji_e", "ji_s", "ji_w", "ji_n", "no", "ji_h", "ji_c"];
+        let mut img_hai: [Vec<HtmlImageElement>; 4] = Default::default();
+        for (kind, &mut ref mut list) in img_hai.iter_mut().enumerate() {
+            let is_zu = kind == 3;
+            let maxnum = if is_zu { 7 } else { 9 };
+
+            for num in 1..=maxnum {
+                let fname = if !is_zu {
+                    format!("hai/p_{}{}_0.gif", kind_table[kind], num)
+                } else {
+                    format!("hai/p_{}_0.gif", zu_table[num])
+                };
+                let img = HtmlImageElement::new().unwrap();
+                let testdata = format!(
+                    "data:image/gif;base64,{}",
+                    asset::read_file(&fname).expect(&format!("File not found: {fname}"))
+                );
+                img.set_src(&testdata);
+
+                list.push(img);
+            }
+        }
 
         Self {
             state: Rc::new(RefCell::new(State::Init)),
@@ -61,7 +81,9 @@ impl MainApp {
             fps_start: 0.0,
             fps_count: 0,
             server_info: Rc::new(RefCell::new(None)),
-            testimg,
+
+            img_hai,
+
             dbg_cmds,
         }
     }
@@ -128,10 +150,6 @@ impl App for MainApp {
             .fill_text(&format!("{:0>5.2}", self.fps), width as f64 - 30.0, 10.0)
             .unwrap();
 
-        context
-            .draw_image_with_html_image_element(&self.testimg, 320.0, 240.0)
-            .unwrap();
-
         context.restore();
 
         let state = &*self.state.borrow();
@@ -139,6 +157,9 @@ impl App for MainApp {
             State::Init => {}
             State::SelectRoom(rooms) => {
                 self.render_select_room(context, rooms);
+            }
+            State::Main(view) => {
+                self.render_game_main(context, view);
             }
         }
     }
@@ -176,6 +197,27 @@ impl MainApp {
         context
             .fill_text(&format!("{} Rooms", rooms.0.len()), 50.0, 50.0)
             .unwrap();
+    }
+
+    fn render_game_main(&self, context: &CanvasRenderingContext2d, view: &Option<jsif::LocalView>) {
+        if view.is_none() {
+            return;
+        }
+
+        let view = view.as_ref().unwrap();
+        let mut x = 100.0;
+
+        log::debug!("{:?}", view.local.hands[0]);
+        for &hai in view.local.hands[0].iter() {
+            let (kind, num, _opt) = mjsys::decode(hai as u16);
+
+            let img = &self.img_hai[kind as usize][num as usize - 1];
+            let w = img.width() as f64;
+            context
+                .draw_image_with_html_image_element(img, x, 250.0)
+                .unwrap();
+            x += w;
+        }
     }
 }
 
@@ -236,6 +278,12 @@ impl MainApp {
         opts.optflag("h", "help", "Print help");
         opts.optopt("c", "create", "Create a room", "ROOM_COMMENT");
         Self::insert_dbg_cmd(&mut dbg_cmds, "room", opts, Self::dbg_room);
+
+        let mut opts = Options::new();
+        opts.optflag("h", "help", "Print help");
+        opts.optopt("r", "room", "Room ID", "ROOM_ID");
+        opts.optopt("p", "player", "Create a room", "PLAYER#");
+        Self::insert_dbg_cmd(&mut dbg_cmds, "game", opts, Self::dbg_game);
 
         dbg_cmds
     }
@@ -325,7 +373,7 @@ impl MainApp {
                 log::debug!("{:?}", result);
                 if let Ok(json) = result {
                     if let Ok(room) = serde_json::from_str::<jsif::Room>(json) {
-                        log::debug!("Room created successfully: room_id={}", room.id);
+                        log::debug!("Room created successfully\n{:?}", room);
                     }
                 }
             });
@@ -333,8 +381,37 @@ impl MainApp {
             let url = format!("http://{SERVER}/api/room");
             self.http.get(&url, |result| {
                 log::debug!("{:?}", result);
+                if let Ok(json) = result {
+                    if let Ok(rooms) = serde_json::from_str::<jsif::RoomList>(json) {
+                        log::debug!("{:?}", rooms);
+                    }
+                }
             });
         }
+
+        Ok(())
+    }
+
+    fn dbg_game(&mut self, opts: &Options, args: Matches) -> Result<()> {
+        if args.opt_present("h") {
+            let brief = "Game API.\ngame [options]";
+            log::debug!("{}", opts.usage(brief));
+            return Ok(());
+        }
+
+        let room = args.opt_str("r").unwrap_or("0".to_string());
+        let player = args.opt_str("p").unwrap_or("0".to_string());
+        let url = format!("http://{SERVER}/api/room/{room}/{player}");
+        let state = Rc::clone(&self.state);
+        self.http.get(&url, move |result| {
+            log::debug!("{:?}", result);
+            if let Ok(json) = result {
+                if let Ok(view) = serde_json::from_str::<jsif::LocalView>(json) {
+                    log::debug!("{:?}", view);
+                    *state.borrow_mut() = State::Main(Some(view));
+                }
+            }
+        });
 
         Ok(())
     }

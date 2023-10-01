@@ -40,12 +40,14 @@ pub fn decode(code: u16) -> (u16, u16, u16) {
     (kind, num, opt)
 }
 
+#[allow(dead_code)]
 pub fn encode(kind: u16, num: u16, opt: u16) -> u16 {
     validate(kind, num, opt);
 
     (opt << HAI_OPT_SFT) | (kind << HAI_KND_SFT) | (num << HAI_NUM_SFT)
 }
 
+#[allow(dead_code)]
 pub fn human_readable_string(code: u16) -> String {
     let kind_char = ['m', 'p', 's', 'z'];
     let (kind, num, _opt) = decode(code);
