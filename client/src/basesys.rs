@@ -333,6 +333,9 @@ impl<T: App + 'static> BaseSys<T> {
         panic::set_hook(Box::new(move |info| {
             old(info);
             set_panic();
+            let _ = web_sys::window()
+                .unwrap()
+                .alert_with_message("Fatal Error: See the debug console.");
         }));
 
         basesys.borrow_mut().app.init();
