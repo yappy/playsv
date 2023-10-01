@@ -9,6 +9,7 @@ pub struct ErrorMsg {
 }
 
 impl ErrorMsg {
+    #[allow(dead_code)]
     pub fn new(message: String) -> Self {
         Self { message }
     }
@@ -16,8 +17,19 @@ impl ErrorMsg {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ServerInfo {
-    pub description: String,
     pub version: String,
+    pub description: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct GetGameResultElement {
+    pub id: u64,
+    pub comment: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct GetGameResult {
+    pub games: Vec<GetGameResultElement>,
 }
 
 // publish to each player

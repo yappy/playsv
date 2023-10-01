@@ -24,11 +24,14 @@ struct AppState {
     games: RwLock<BTreeMap<u64, (mj::Game, String)>>,
 }
 
-#[get("/info")]
+/// /info
+///
+/// jsif::ServerInfo
+#[get("/api/info")]
 async fn info() -> impl Responder {
     let info = jsif::ServerInfo {
-        description: "now testing...".to_string(),
         version: GIT_VERSION.to_string(),
+        description: "now testing...".to_string(),
     };
 
     HttpResponse::Ok().json(info)
@@ -36,6 +39,8 @@ async fn info() -> impl Responder {
 
 #[get("/")]
 async fn index(data: web::Data<AppState>) -> impl Responder {
+    // TODO: return wasm page?
+
     let mut msg = "".to_string();
     {
         // rlock
@@ -49,22 +54,10 @@ async fn index(data: web::Data<AppState>) -> impl Responder {
     HttpResponse::Ok().body(simple_html("Hello", &msg))
 }
 
-/*
- * URL: /games
- * Get/Add-to active game list
- */
-#[derive(Serialize, Deserialize)]
-struct GetGameResultElement {
-    id: u64,
-    comment: String,
-}
-
-#[derive(Serialize, Deserialize)]
-struct GetGameResult {
-    games: Vec<GetGameResultElement>,
-}
-
-#[get("/games")]
+/// URL: /games
+///
+/// Get/Add-to active game list
+#[get("/api/games")]
 async fn get_games(data: web::Data<AppState>) -> impl Responder {
     let result;
     {
@@ -72,12 +65,12 @@ async fn get_games(data: web::Data<AppState>) -> impl Responder {
         let games = data.games.read().unwrap();
         let list = games
             .iter()
-            .map(|(id, (_game, comment))| GetGameResultElement {
+            .map(|(id, (_game, comment))| jsif::GetGameResultElement {
                 id: *id,
                 comment: comment.clone(),
             })
             .collect();
-        result = GetGameResult { games: list };
+        result = jsif::GetGameResult { games: list };
         // unlock
     }
 
@@ -94,8 +87,8 @@ struct PostGameResult {
     id: u64,
 }
 
-// curl -X POST -H "Content-Type: application/json" -d '{"comment": "aaa"}' -v localhost:8080/games
-#[post("/games")]
+// curl -X POST -H "Content-Type: application/json" -d '{"comment": "aaa"}' -v localhost:8888/games
+#[post("/api/games")]
 async fn post_games(data: web::Data<AppState>, param: web::Json<PostGameParam>) -> impl Responder {
     println!("POST /game {:?}", param);
     if param.comment.len() > STRING_MAX {
@@ -128,7 +121,7 @@ async fn post_games(data: web::Data<AppState>, param: web::Json<PostGameParam>) 
         .body(body)
 }
 
-#[get("/games/{id}/{player}")]
+#[get("/api/games/{id}/{player}")]
 async fn get_games_id(data: web::Data<AppState>, path: web::Path<(u64, u32)>) -> impl Responder {
     let (id, player) = path.into_inner();
 

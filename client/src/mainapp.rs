@@ -1,12 +1,15 @@
 use crate::{
     asset,
     basesys::{App, BaseSys},
+    jsif,
     net::PollingHttp,
 };
 use anyhow::{bail, Result};
 use getopts::{Matches, Options};
-use std::{collections::HashMap, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 use web_sys::{CanvasRenderingContext2d, HtmlImageElement};
+
+const SERVER: &str = "127.0.0.1:8888";
 
 const CANVAS_W: u32 = 640;
 const CANVAS_H: u32 = 480;
@@ -20,6 +23,7 @@ struct DbgCmd {
 struct MainApp {
     http: PollingHttp,
     frame: u64,
+    server_info: Rc<RefCell<Option<String>>>,
     testimg: HtmlImageElement,
 
     dbg_cmds: HashMap<&'static str, DbgCmd>,
@@ -40,6 +44,7 @@ impl MainApp {
         Self {
             http,
             frame: 0,
+            server_info: Rc::new(RefCell::new(None)),
             testimg,
             dbg_cmds,
         }
@@ -47,6 +52,16 @@ impl MainApp {
 }
 
 impl App for MainApp {
+    fn init(&mut self) {
+        let url = format!("http://{SERVER}/api/info");
+        let dest = Rc::clone(&self.server_info);
+        self.http.request(&url, move |result| {
+            let info: jsif::ServerInfo = serde_json::from_str(result.expect("HTTP request error"))
+                .expect("Json parse error");
+            *dest.borrow_mut() = Some(format!("{}\n{}", info.version, info.description));
+        });
+    }
+
     fn frame(&mut self) {
         self.http.poll();
         self.frame += 1;
@@ -58,6 +73,16 @@ impl App for MainApp {
         let color = format!("#{0:>02x}{0:>02x}{0:>02x}", t);
         context.set_fill_style(&color.into());
         context.fill_rect(0.0, 0.0, width as f64, height as f64);
+
+        context.set_fill_style(&"white".to_string().into());
+        context.set_font("10px monospace");
+        let info = &*self.server_info.borrow();
+        let infostr = if let Some(info) = info {
+            info
+        } else {
+            "Getting server info..."
+        };
+        context.fill_text(infostr, 10.0, 10.0).unwrap();
 
         context
             .draw_image_with_html_image_element(&self.testimg, 320.0, 240.0)
@@ -128,10 +153,6 @@ impl MainApp {
 
         let mut opts = Options::new();
         opts.optflag("h", "help", "Print help");
-        Self::insert_dbg_cmd(&mut dbg_cmds, "frame", opts, Self::dbg_frame);
-
-        let mut opts = Options::new();
-        opts.optflag("h", "help", "Print help");
         Self::insert_dbg_cmd(&mut dbg_cmds, "file", opts, Self::dbg_file);
 
         let mut opts = Options::new();
@@ -167,24 +188,6 @@ impl MainApp {
                 };
                 func(self, &opts, matches)?;
             }
-        }
-
-        Ok(())
-    }
-
-    fn dbg_frame(&mut self, opts: &Options, args: Matches) -> Result<()> {
-        if args.opt_present("h") {
-            let brief = "Get/Set frame count.\nframe [options] [SETVALUE]";
-            log::debug!("{}", opts.usage(brief));
-            return Ok(());
-        }
-
-        if !args.free.is_empty() {
-            let value = args.free[0].parse()?;
-            self.frame = value;
-            log::debug!("Set: {}", value);
-        } else {
-            log::debug!("{}", self.frame);
         }
 
         Ok(())

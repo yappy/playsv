@@ -1,4 +1,4 @@
-use std::{cell::RefCell, collections::VecDeque, rc::Rc};
+use std::{cell::RefCell, collections::VecDeque, rc::Rc, sync::atomic::AtomicBool};
 use wasm_bindgen::{prelude::*, JsCast};
 use web_sys::{
     CanvasRenderingContext2d, Document, HtmlCanvasElement, HtmlElement, HtmlInputElement,
@@ -112,7 +112,9 @@ impl<T: App + 'static> BaseSys<T> {
         let context = context2d(&self.back_canvas);
 
         self.app.frame();
+        context.save();
         self.app.render(&context, self.canvas_w, self.canvas_h);
+        context.restore();
 
         // TODO animationFrame would be better
         self.flip();
