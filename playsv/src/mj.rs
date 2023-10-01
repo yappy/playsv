@@ -65,7 +65,7 @@ impl Game {
         }
     }
 
-    pub fn get_view(&self, player: u32) -> Result<String, String> {
+    pub fn get_view(&self, player: u32) -> Result<jsif::LocalView, String> {
         // read lock and (common, internal) <- state
         let GameState { common, internal } = &*self.0.read().unwrap();
         if player >= common.player_count {
@@ -80,8 +80,6 @@ impl Game {
             local: Self::convert_to_local_state(common, internal, player),
         };
 
-        // return as json string
-        let result = serde_json::to_string(&result).unwrap();
         Ok(result)
     }
 

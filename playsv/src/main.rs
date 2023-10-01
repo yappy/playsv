@@ -1,5 +1,5 @@
-mod mj;
 mod jsif;
+mod mj;
 mod mjsys;
 
 use actix_cors::Cors;
@@ -24,37 +24,14 @@ struct AppState {
     games: RwLock<BTreeMap<u64, (mj::Game, String)>>,
 }
 
-/*
- * Common error response (Not 2XX response)
- */
-#[derive(Serialize, Deserialize)]
-struct ErrorMsg {
-    message: String,
-}
-
-fn error_json(message: String) -> String {
-    let obj = ErrorMsg { message };
-
-    serde_json::to_string(&obj).unwrap()
-}
-
 #[get("/info")]
 async fn info() -> impl Responder {
-    #[derive(Serialize)]
-    struct InfoObj {
-        description: String,
-        version: String,
-    }
-
-    let info = InfoObj {
+    let info = jsif::ServerInfo {
         description: "now testing...".to_string(),
         version: GIT_VERSION.to_string(),
     };
-    let body = serde_json::to_string(&info).unwrap();
 
-    HttpResponse::Ok()
-        .content_type("application/json")
-        .body(body)
+    HttpResponse::Ok().json(info)
 }
 
 #[get("/")]
@@ -103,11 +80,8 @@ async fn get_games(data: web::Data<AppState>) -> impl Responder {
         result = GetGameResult { games: list };
         // unlock
     }
-    let body = serde_json::to_string(&result).unwrap();
 
-    HttpResponse::Ok()
-        .content_type("application/json")
-        .body(body)
+    HttpResponse::Ok().json(result)
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -132,9 +106,7 @@ async fn post_games(data: web::Data<AppState>, param: web::Json<PostGameParam>) 
     let new_game = match mj::Game::new() {
         Ok(game) => game,
         Err(msg) => {
-            return HttpResponse::BadRequest()
-                .content_type("application/json")
-                .body(error_json(msg));
+            return HttpResponse::BadRequest().json(jsif::ErrorMsg::new(msg));
         }
     };
 
@@ -167,21 +139,11 @@ async fn get_games_id(data: web::Data<AppState>, path: web::Path<(u64, u32)>) ->
         if let Some(game) = game {
             let view = game.0.get_view(player);
             match view {
-                Ok(result) => {
-                    return HttpResponse::Ok()
-                        .content_type("application/json")
-                        .body(result)
-                }
-                Err(msg) => {
-                    return HttpResponse::BadRequest()
-                        .content_type("application/json")
-                        .body(error_json(msg))
-                }
+                Ok(result) => HttpResponse::Ok().json(result),
+                Err(msg) => HttpResponse::BadRequest().json(jsif::ErrorMsg::new(msg)),
             }
         } else {
-            return HttpResponse::BadRequest()
-                .content_type("application/json")
-                .body(error_json("Invalid id".to_string()));
+            HttpResponse::BadRequest().json(jsif::ErrorMsg::new("Invalid id".to_string()))
         }
         // unlock
     }

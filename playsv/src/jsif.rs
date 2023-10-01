@@ -1,5 +1,25 @@
 use serde::{Deserialize, Serialize};
 
+/*
+ * Common error response (Not 2XX response)
+ */
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ErrorMsg {
+    pub message: String,
+}
+
+impl ErrorMsg {
+    pub fn new(message: String) -> Self {
+        Self { message }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ServerInfo {
+    pub description: String,
+    pub version: String,
+}
+
 // publish to each player
 #[derive(Debug, Serialize, Deserialize)]
 pub struct LocalView {
