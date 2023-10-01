@@ -22,14 +22,17 @@ pub struct ServerInfo {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct GetGameResultElement {
+pub struct Room {
     pub id: u64,
     pub comment: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct GetGameResult {
-    pub games: Vec<GetGameResultElement>,
+pub struct RoomList(pub Vec<Room>);
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CreateRoom {
+    pub comment: String,
 }
 
 // publish to each player

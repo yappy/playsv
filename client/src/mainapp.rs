@@ -20,7 +20,15 @@ struct DbgCmd {
     func: Rc<Box<DbgCmdFunc>>,
 }
 
+enum State {
+    Init,
+    SelectRoom(Option<jsif::RoomList>),
+    //Main(Option<jsif::LocalView>),
+}
+
 struct MainApp {
+    state: Rc<RefCell<State>>,
+
     http: PollingHttp,
     frame: u64,
     fps: f64,
@@ -45,6 +53,8 @@ impl MainApp {
         testimg.set_src(&testdata);
 
         Self {
+            state: Rc::new(RefCell::new(State::Init)),
+
             http,
             frame: 0,
             fps: 0.0,
@@ -61,15 +71,24 @@ impl App for MainApp {
     fn init(&mut self) {
         let url = format!("http://{SERVER}/api/info");
         let dest = Rc::clone(&self.server_info);
-        self.http.request(&url, move |result| {
+        self.http.get(&url, move |result| {
             let info: jsif::ServerInfo = serde_json::from_str(result.expect("HTTP request error"))
                 .expect("Json parse error");
             *dest.borrow_mut() = Some(format!("{}\n{}", info.version, info.description));
         });
+
+        let url = format!("http://{SERVER}/api/room");
+        let dest = Rc::clone(&self.state);
+        self.http.get(&url, move |result| {
+            let rooms: jsif::RoomList = serde_json::from_str(result.expect("HTTP request error"))
+                .expect("Json parse error");
+            *dest.borrow_mut() = State::SelectRoom(Some(rooms));
+        });
+        *self.state.borrow_mut() = State::SelectRoom(None);
     }
 
     fn frame(&mut self) {
-        // ms
+        // fps
         let now = web_sys::window().unwrap().performance().unwrap().now();
         let elapsed = now - self.fps_start;
         self.fps_count += 1;
@@ -78,18 +97,22 @@ impl App for MainApp {
             self.fps_count = 0;
             self.fps_start = now;
         }
-
-        self.http.poll();
         self.frame += 1;
+
+        // poll network
+        self.http.poll();
     }
 
     fn render(&mut self, context: &CanvasRenderingContext2d, width: u32, height: u32) {
         let t = self.frame as u8;
+        context.save();
 
+        // clear
         let color = format!("#{0:>02x}{0:>02x}{0:>02x}", t);
         context.set_fill_style(&color.into());
         context.fill_rect(0.0, 0.0, width as f64, height as f64);
 
+        // server info
         context.set_fill_style(&"white".to_string().into());
         context.set_font("10px monospace");
         let info = &*self.server_info.borrow();
@@ -100,6 +123,7 @@ impl App for MainApp {
         };
         context.fill_text(infostr, 10.0, 10.0).unwrap();
 
+        // fps
         context
             .fill_text(&format!("{:0>5.2}", self.fps), width as f64 - 30.0, 10.0)
             .unwrap();
@@ -107,6 +131,16 @@ impl App for MainApp {
         context
             .draw_image_with_html_image_element(&self.testimg, 320.0, 240.0)
             .unwrap();
+
+        context.restore();
+
+        let state = &*self.state.borrow();
+        match state {
+            State::Init => {}
+            State::SelectRoom(rooms) => {
+                self.render_select_room(context, rooms);
+            }
+        }
     }
 
     fn on_debug_command(&mut self, cmdline: &str) {
@@ -123,6 +157,25 @@ impl App for MainApp {
                 log::error!("{:?}", e)
             }
         }
+    }
+}
+
+impl MainApp {
+    fn render_select_room(
+        &self,
+        context: &CanvasRenderingContext2d,
+        rooms: &Option<jsif::RoomList>,
+    ) {
+        if rooms.is_none() {
+            return;
+        }
+        let rooms = rooms.as_ref().unwrap();
+
+        context.set_fill_style(&"white".to_string().into());
+        context.set_font("32px serif");
+        context
+            .fill_text(&format!("{} Rooms", rooms.0.len()), 50.0, 50.0)
+            .unwrap();
     }
 }
 
@@ -178,6 +231,11 @@ impl MainApp {
         let mut opts = Options::new();
         opts.optflag("h", "help", "Print help");
         Self::insert_dbg_cmd(&mut dbg_cmds, "http", opts, Self::dbg_http);
+
+        let mut opts = Options::new();
+        opts.optflag("h", "help", "Print help");
+        opts.optopt("c", "create", "Create a room", "ROOM_COMMENT");
+        Self::insert_dbg_cmd(&mut dbg_cmds, "room", opts, Self::dbg_room);
 
         dbg_cmds
     }
@@ -244,9 +302,39 @@ impl MainApp {
             .get(0)
             .map_or("http://127.0.0.1:8080/", |s| s.as_str());
         log::debug!("HTTP: {url}");
-        self.http.request(url, |result| {
+        self.http.get(url, |result| {
             log::debug!("{:?}", result);
         });
+
+        Ok(())
+    }
+
+    fn dbg_room(&mut self, opts: &Options, args: Matches) -> Result<()> {
+        if args.opt_present("h") {
+            let brief = "Room API.\nroom [options] [URL]";
+            log::debug!("{}", opts.usage(brief));
+            return Ok(());
+        }
+
+        if let Some(comment) = args.opt_str("c") {
+            let url = format!("http://{SERVER}/api/room");
+            let param = jsif::CreateRoom {
+                comment: comment.clone(),
+            };
+            self.http.post(&url, &param, |result| {
+                log::debug!("{:?}", result);
+                if let Ok(json) = result {
+                    if let Ok(room) = serde_json::from_str::<jsif::Room>(json) {
+                        log::debug!("Room created successfully: room_id={}", room.id);
+                    }
+                }
+            });
+        } else {
+            let url = format!("http://{SERVER}/api/room");
+            self.http.get(&url, |result| {
+                log::debug!("{:?}", result);
+            });
+        }
 
         Ok(())
     }

@@ -1,4 +1,5 @@
 use anyhow::{anyhow, Result};
+use serde::Serialize;
 use web_sys::XmlHttpRequest;
 
 pub type Handler = Box<dyn FnMut(Result<&str>)>;
@@ -62,16 +63,39 @@ impl PollingHttp {
         self.rest()
     }
 
-    pub fn request<F>(&mut self, url: &str, callback: F)
+    pub fn request<F>(&mut self, url: &str, method: &str, data: &str, callback: F)
     where
         F: FnMut(Result<&str>) + 'static,
     {
         let request = XmlHttpRequest::new().unwrap();
-        request.open("GET", url).unwrap();
-        request.send().unwrap();
+        request.open(method, url).unwrap();
+        if data == "" {
+            request.send().unwrap();
+        } else {
+            request
+                .set_request_header("Content-Type", "application/json")
+                .unwrap();
+            request.send_with_opt_str(Some(data)).unwrap();
+        }
 
         let callback = Box::new(callback);
 
         self.reqs.push(ReqElem { request, callback });
+    }
+
+    pub fn get<F>(&mut self, url: &str, callback: F)
+    where
+        F: FnMut(Result<&str>) + 'static,
+    {
+        self.request(url, "GET", "", callback)
+    }
+
+    pub fn post<T, F>(&mut self, url: &str, data: &T, callback: F)
+    where
+        T: Serialize,
+        F: FnMut(Result<&str>) + 'static,
+    {
+        let data = serde_json::to_string(data).unwrap();
+        self.request(url, "POST", &data, callback)
     }
 }
