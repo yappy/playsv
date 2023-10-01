@@ -101,14 +101,14 @@ impl Game {
                 // hand
                 local.points[ius] = internal.points[pus];
                 local.hands[ius] = internal.hands[pus].clone();
-                for hai in &*local.hands[ius] {
-                    let code = *hai as u16;
+                for pai in &*local.hands[ius] {
+                    let code = *pai as u16;
                     local.hands_str[ius].push(mjsys::to_human_readable_string(code).unwrap());
                 }
                 // draw
                 local.draws[ius] = internal.draws[pus].unwrap_or(-1);
                 local.draws_str[ius] = match internal.draws[pus] {
-                    Some(hai) => mjsys::to_human_readable_string(hai as u16).unwrap(),
+                    Some(pai) => mjsys::to_human_readable_string(pai as u16).unwrap(),
                     None => "".to_string(),
                 };
                 // action
@@ -227,8 +227,8 @@ impl GameState {
                     // take 4, 4, 4, 1
                     let take_num = if count == 3 { 1 } else { 4 };
                     for _ in 0..take_num {
-                        let hai = internal.yama.pop().unwrap();
-                        internal.hands[player as usize].push(hai);
+                        let pai = internal.yama.pop().unwrap();
+                        internal.hands[player as usize].push(pai);
                     }
                 }
             }
@@ -243,11 +243,11 @@ impl GameState {
         self.check();
     }
 
-    // Turn player draws a hai
+    // Turn player draws a pai
     fn draw(&mut self) {
         let (common, internal) = (&mut self.common, &mut self.internal);
 
-        // all player must not have draw hai
+        // all player must not have draw pai
         // yama.len() must be > 0
         for p in 0..common.player_count as usize {
             assert!(internal.draws[p].is_none());
@@ -263,7 +263,7 @@ impl GameState {
         // create action list
         let ap_actions = &mut internal.actions[common.turn as usize];
         let ap_hand = &internal.hands[common.turn as usize];
-        for (i, _hai) in ap_hand.iter().enumerate() {
+        for (i, _pai) in ap_hand.iter().enumerate() {
             ap_actions.push(jsif::Action::Discard(i as i32));
         }
     }

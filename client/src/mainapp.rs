@@ -37,7 +37,7 @@ struct MainApp {
     server_info: Rc<RefCell<Option<String>>>,
 
     // [kind][num]
-    img_hai: [Vec<HtmlImageElement>; 4],
+    img_pai: [Vec<HtmlImageElement>; 4],
 
     dbg_cmds: HashMap<&'static str, DbgCmd>,
 }
@@ -50,17 +50,17 @@ impl MainApp {
 
         let kind_table = ["ms", "ps", "ss"];
         let zu_table = ["", "ji_e", "ji_s", "ji_w", "ji_n", "no", "ji_h", "ji_c"];
-        let mut img_hai: [Vec<HtmlImageElement>; 4] = Default::default();
-        for (kind, &mut ref mut list) in img_hai.iter_mut().enumerate() {
+        let mut img_pai: [Vec<HtmlImageElement>; 4] = Default::default();
+        for (kind, &mut ref mut list) in img_pai.iter_mut().enumerate() {
             let is_zu = kind == 3;
             let maxnum = if is_zu { 7 } else { 9 };
 
             #[allow(clippy::needless_range_loop)]
             for num in 1..=maxnum {
                 let fname = if !is_zu {
-                    format!("hai/p_{}{}_0.gif", kind_table[kind], num)
+                    format!("pai/p_{}{}_0.gif", kind_table[kind], num)
                 } else {
-                    format!("hai/p_{}_0.gif", zu_table[num])
+                    format!("pai/p_{}_0.gif", zu_table[num])
                 };
                 let img = HtmlImageElement::new().unwrap();
                 let testdata = format!(
@@ -83,7 +83,7 @@ impl MainApp {
             fps_count: 0,
             server_info: Rc::new(RefCell::new(None)),
 
-            img_hai,
+            img_pai,
 
             dbg_cmds,
         }
@@ -213,10 +213,10 @@ impl MainApp {
         let mut x = 100.0;
 
         log::debug!("{:?}", view.local.hands[0]);
-        for &hai in view.local.hands[0].iter() {
-            let (kind, num, _opt) = mjsys::decode(hai as u16);
+        for &pai in view.local.hands[0].iter() {
+            let (kind, num, _opt) = mjsys::decode(pai as u16).unwrap();
 
-            let img = &self.img_hai[kind as usize][num as usize - 1];
+            let img = &self.img_pai[kind as usize][num as usize - 1];
             let w = img.width() as f64;
             context
                 .draw_image_with_html_image_element(img, x, 250.0)
