@@ -1,4 +1,7 @@
-use super::{FinishHand, MianziType, PointParam};
+use super::{FinishHand, PointParam};
+
+// Not implemented yet:
+// Nagashi-Mangan, Renho, Sanrenko, Surenko, Daisharin, Parenchan
 
 // https://ja.wikipedia.org/wiki/%E9%BA%BB%E9%9B%80%E3%81%AE%E5%BD%B9%E4%B8%80%E8%A6%A7
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
@@ -102,10 +105,57 @@ impl Yaku {
             inv => panic!("Invalid Yaku: {}", inv.0),
         }
     }
-}
 
-// TODO:
-// Nagashi-Mangan, Renho, Sanrenko, Surenko, Daisharin, Parenchan
+    pub fn to_japanese_str(&self) -> &'static str {
+        // https://ja.wikipedia.org/wiki/%E9%BA%BB%E9%9B%80%E3%81%AE%E5%BD%B9%E4%B8%80%E8%A6%A7
+        match *self {
+            Self::REACH => "立直",
+            Self::IPPATSU => "一発",
+            Self::TSUMO => "門前清自摸和",
+            Self::TANYAO => "断么九",
+            Self::PINHU => "平和",
+            Self::IPEKO => "一盃口",
+            Self::FIELD_E => "場風牌・東",
+            Self::FIELD_S => "場風牌・南",
+            Self::FIELD_W => "場風牌・西",
+            Self::FIELD_N => "場風牌・北",
+            Self::SELF_E => "自風牌・東",
+            Self::SELF_S => "自風牌・南",
+            Self::SELF_W => "自風牌・西",
+            Self::SELF_N => "自風牌・北",
+            Self::YAKU_HAKU => "役牌",
+            Self::YAKU_HATSU => "役牌",
+            Self::YAKU_CHUN => "役牌",
+            Self::RINSHAN => "嶺上開花",
+            Self::CHANKAN => "搶槓",
+            Self::HAITEI => "海底摸月",
+            Self::HOTEI => "河底撈魚",
+            Self::DOJUN => "三色同順",
+            Self::DOJUN_N => "三色同順↓",
+            Self::ITTSU => "一気通貫",
+            Self::ITTSU_N => "一気通貫↓",
+            Self::CHANTA => "混全帯么九",
+            Self::CHANTA_N => "混全帯么九↓",
+            Self::CHITOI => "七対子",
+            Self::TOITOI => "対々和",
+            Self::SANANKO => "三暗刻",
+            Self::HONRO => "混老頭",
+            Self::DOKO => "三色同刻",
+            Self::SANKAN => "三槓子",
+            Self::SHOSANGEN => "小三元",
+            Self::DBLREACH => "ダブル立直",
+            Self::YAKU3_HON => "混一色",
+            Self::YAKU2_HON_N => "混一色↓",
+            Self::YAKU3_JUNCHAN => "純全帯么九",
+            Self::YAKU2_JUNCHAN_N => "純全帯么九↓",
+            Self::YAKU3_LIANGPEKO => "二盃口",
+            Self::YAKU6_CHIN => "清一色",
+            Self::YAKU5_CHIN_N => "清一色↓",
+
+            inv => panic!("Invalid Yaku: {}", inv.0),
+        }
+    }
+}
 
 pub fn check_yaku(hand: &FinishHand, param: &PointParam, menzen: bool) -> u64 {
     let mut yaku = 0;
@@ -199,4 +249,31 @@ pub fn check_yaku(hand: &FinishHand, param: &PointParam, menzen: bool) -> u64 {
     }
 
     yaku
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn fan_all(){
+        let mut bit = 1u64;
+        while bit <= Yaku::YAKU_END.0 {
+            let fan = Yaku(bit).fan();
+            assert!(fan > 0);
+            bit <<= 1;
+        }
+    }
+
+    #[test]
+    fn japanese_all(){
+        let mut bit = 1u64;
+        while bit <= Yaku::YAKU_END.0 {
+            let j = Yaku(bit).to_japanese_str();
+            assert!(j.len() > 0);
+            bit <<= 1;
+        }
+    }
+
 }
