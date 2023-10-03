@@ -28,22 +28,22 @@ impl Yaku {
     pub const HAITEI            : Self = Self(1 << 19);
     pub const HOTEI             : Self = Self(1 << 20);
 
-    pub const DOJUN             : Self = Self(1 << 20);
-    pub const DOJUN_N           : Self = Self(1 << 21);
-    pub const ITTSU             : Self = Self(1 << 22);
-    pub const ITTSU_N           : Self = Self(1 << 23);
-    pub const CHANTA            : Self = Self(1 << 24);
-    pub const CHANTA_N          : Self = Self(1 << 25);
-    pub const CHITOI            : Self = Self(1 << 26);
-    pub const TOITOI            : Self = Self(1 << 27);
-    pub const SANANKO           : Self = Self(1 << 28);
-    pub const HONRO             : Self = Self(1 << 29);
-    pub const DOKO              : Self = Self(1 << 30);
-    pub const SANKAN            : Self = Self(1 << 31);
-    pub const SHOSANGEN         : Self = Self(1 << 32);
-    pub const DBLREACH          : Self = Self(1 << 33);
+    pub const DOJUN             : Self = Self(1 << 21);
+    pub const DOJUN_N           : Self = Self(1 << 22);
+    pub const ITTSU             : Self = Self(1 << 23);
+    pub const ITTSU_N           : Self = Self(1 << 24);
+    pub const CHANTA            : Self = Self(1 << 25);
+    pub const CHANTA_N          : Self = Self(1 << 26);
+    pub const CHITOI            : Self = Self(1 << 27);
+    pub const TOITOI            : Self = Self(1 << 28);
+    pub const SANANKO           : Self = Self(1 << 29);
+    pub const HONRO             : Self = Self(1 << 30);
+    pub const DOKO              : Self = Self(1 << 31);
+    pub const SANKAN            : Self = Self(1 << 32);
+    pub const SHOSANGEN         : Self = Self(1 << 33);
+    pub const DBLREACH          : Self = Self(1 << 34);
 
-    pub const YAKU3_HON         : Self = Self(1 << 34);
+    pub const YAKU3_HON         : Self = Self(1 << 35);
     pub const YAKU2_HON_N       : Self = Self(1 << 36);
     pub const YAKU3_JUNCHAN     : Self = Self(1 << 37);
     pub const YAKU2_JUNCHAN_N   : Self = Self(1 << 38);
@@ -53,6 +53,55 @@ impl Yaku {
     pub const YAKU5_CHIN_N      : Self = Self(1 << 41);
 
     pub const YAKU_END: Self = Self::YAKU5_CHIN_N;
+}
+
+impl Yaku {
+    pub fn fan(&self) -> u32 {
+        match *self {
+            Self::REACH
+            | Self::IPPATSU
+            | Self::TSUMO
+            | Self::TANYAO
+            | Self::PINHU
+            | Self::IPEKO
+            | Self::FIELD_E
+            | Self::FIELD_S
+            | Self::FIELD_W
+            | Self::FIELD_N
+            | Self::SELF_E
+            | Self::SELF_S
+            | Self::SELF_W
+            | Self::SELF_N
+            | Self::YAKU_HAKU
+            | Self::YAKU_HATSU
+            | Self::YAKU_CHUN
+            | Self::RINSHAN
+            | Self::CHANKAN
+            | Self::HAITEI
+            | Self::HOTEI => 1,
+
+            Self::DOJUN
+            | Self::ITTSU
+            | Self::CHANTA
+            | Self::CHITOI
+            | Self::TOITOI
+            | Self::SANANKO
+            | Self::HONRO
+            | Self::DOKO
+            | Self::SANKAN
+            | Self::SHOSANGEN
+            | Self::DBLREACH => 2,
+            Self::DOJUN_N | Self::ITTSU_N | Self::CHANTA_N => 1,
+
+            Self::YAKU3_HON | Self::YAKU3_JUNCHAN | Self::YAKU3_LIANGPEKO => 3,
+            Self::YAKU2_HON_N | Self::YAKU2_JUNCHAN_N => 2,
+
+            Self::YAKU6_CHIN => 6,
+            Self::YAKU5_CHIN_N => 5,
+
+            inv => panic!("Invalid Yaku: {}", inv.0),
+        }
+    }
 }
 
 // TODO:
