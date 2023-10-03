@@ -20,9 +20,9 @@ impl Yaku {
     pub const SELF_S            : Self = Self(1 << 11);
     pub const SELF_W            : Self = Self(1 << 12);
     pub const SELF_N            : Self = Self(1 << 13);
-    pub const YAKU_P            : Self = Self(1 << 14);
-    pub const YAKU_H            : Self = Self(1 << 15);
-    pub const YAKU_C            : Self = Self(1 << 16);
+    pub const YAKU_HAKU         : Self = Self(1 << 14);
+    pub const YAKU_HATSU        : Self = Self(1 << 15);
+    pub const YAKU_CHUN         : Self = Self(1 << 16);
     pub const RINSHAN           : Self = Self(1 << 17);
     pub const CHANKAN           : Self = Self(1 << 18);
     pub const HAITEI            : Self = Self(1 << 19);
@@ -121,6 +121,28 @@ pub fn check_yaku(hand: &FinishHand, param: &PointParam, menzen: bool) -> u64 {
                 _ => panic!("Invalid self_wind: {}", param.field_wind),
             }
             .0;
+        }
+        for m in hand.mianzi_list.iter() {
+            if m.mtype.is_same() {
+                match m.pai {
+                    31 => yaku |= Yaku::YAKU_HAKU.0,
+                    32 => yaku |= Yaku::YAKU_HATSU.0,
+                    33 => yaku |= Yaku::YAKU_CHUN.0,
+                    _ => {}
+                }
+            }
+        }
+        if param.lingshang {
+            yaku |= Yaku::RINSHAN.0;
+        }
+        if param.chankan {
+            yaku |= Yaku::CHANKAN.0;
+        }
+        if param.haitei {
+            yaku |= Yaku::HAITEI.0;
+        }
+        if param.houtei {
+            yaku |= Yaku::HOTEI.0;
         }
     }
 

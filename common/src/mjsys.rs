@@ -268,7 +268,7 @@ pub struct PointParam {
     self_wind: u8,
     reach: bool,
     reach_first: bool,
-    chanlan: bool,
+    chankan: bool,
     lingshang: bool,
     haitei: bool,
     houtei: bool,
