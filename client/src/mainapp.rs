@@ -214,7 +214,7 @@ impl MainApp {
 
         log::debug!("{:?}", view.local.hands[0]);
         for &pai in view.local.hands[0].iter() {
-            let (kind, num, _opt) = mjsys::decode(pai as u16).unwrap();
+            let (kind, num) = mjsys::decode(pai as u8).unwrap();
 
             let img = &self.img_pai[kind as usize][num as usize - 1];
             let w = img.width() as f64;

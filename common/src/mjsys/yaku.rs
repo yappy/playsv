@@ -28,8 +28,8 @@ impl Yaku {
     pub const HAITEI            : Self = Self(1 << 19);
     pub const HOTEI             : Self = Self(1 << 20);
 
-    pub const DOJUN3            : Self = Self(1 << 20);
-    pub const DOJUN3_N          : Self = Self(1 << 21);
+    pub const DOJUN             : Self = Self(1 << 20);
+    pub const DOJUN_N           : Self = Self(1 << 21);
     pub const ITTSU             : Self = Self(1 << 22);
     pub const ITTSU_N           : Self = Self(1 << 23);
     pub const CHANTA            : Self = Self(1 << 24);
@@ -38,7 +38,7 @@ impl Yaku {
     pub const TOITOI            : Self = Self(1 << 27);
     pub const SANANKO           : Self = Self(1 << 28);
     pub const HONRO             : Self = Self(1 << 29);
-    pub const DOKO3             : Self = Self(1 << 30);
+    pub const DOKO              : Self = Self(1 << 30);
     pub const SANKAN            : Self = Self(1 << 31);
     pub const SHOSANGEN         : Self = Self(1 << 32);
     pub const DBLREACH          : Self = Self(1 << 33);
@@ -72,7 +72,7 @@ pub fn check_yaku(hand: &FinishHand, param: &PointParam, menzen: bool) -> u64 {
     }
     {
         let tan1 = hand.mianzi_list.iter().all(|m| m.is_tanyao());
-        let tan2 = super::is_tanyao(hand.head as u16).unwrap();
+        let tan2 = super::is_tanyao(hand.head).unwrap();
         if tan1 && tan2 {
             yaku |= Yaku::TANYAO.0;
         }
@@ -94,6 +94,7 @@ pub fn check_yaku(hand: &FinishHand, param: &PointParam, menzen: bool) -> u64 {
         }
     }
     {
+        // 1
         let f_yes = hand
             .mianzi_list
             .iter()
@@ -144,6 +145,8 @@ pub fn check_yaku(hand: &FinishHand, param: &PointParam, menzen: bool) -> u64 {
         if param.houtei {
             yaku |= Yaku::HOTEI.0;
         }
+
+        // 2
     }
 
     yaku

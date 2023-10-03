@@ -16,72 +16,68 @@ mod yaku;
 
 use anyhow::{bail, ensure, Result};
 
-const PAI_COUNT: usize = 34;
-const PAI_OPT_MASK: u16 = 0xff00;
-const PAI_KINDNUM_MASK: u16 = 0x00ff;
-const PAI_OPT_SFT: u32 = 8;
-const PAI_KINDNUM_SFT: u32 = 0;
+pub const PAI_COUNT: usize = 34;
+pub const OFFSET_M: u8 = 0;
+pub const OFFSET_P: u8 = 9;
+pub const OFFSET_S: u8 = 18;
+pub const OFFSET_J: u8 = 27;
 
-fn validate(kind: u16, num: u16, opt: u16) -> Result<()> {
+fn validate(kind: u8, num: u8) -> Result<()> {
     ensure!(kind <= 3);
     ensure!((1..=9).contains(&num));
     if kind == 3 {
         ensure!(num <= 7);
     }
-    ensure!(opt < 256);
 
     Ok(())
 }
 
 // returns (kind, number, opt)
-pub fn decode(code: u16) -> Result<(u16, u16, u16)> {
-    let opt = (code & PAI_OPT_MASK) >> PAI_OPT_SFT;
-    let kindnum = (code & PAI_KINDNUM_MASK) >> PAI_KINDNUM_SFT;
-    let kind = kindnum / 9;
-    let num = kindnum % 9 + 1;
+pub fn decode(code: u8) -> Result<(u8, u8)> {
+    let kind = code / 9;
+    let num = code % 9 + 1;
 
-    validate(kind, num, opt)?;
+    validate(kind, num)?;
 
-    Ok((kind, num, opt))
+    Ok((kind, num))
 }
 
-pub fn encode(kind: u16, num: u16, opt: u16) -> Result<u16> {
-    validate(kind, num, opt)?;
+pub fn encode(kind: u8, num: u8) -> Result<u8> {
+    validate(kind, num)?;
 
-    let kindnum = kind * 9 + (num - 1);
-    Ok((opt << PAI_OPT_SFT) | (kindnum << PAI_KINDNUM_SFT))
+    Ok(kind * 9 + (num - 1))
 }
 
-pub fn is_ji(code: u16) -> Result<bool> {
-    let (kind, num, _opt) = decode(code)?;
+pub fn is_ji(code: u8) -> Result<bool> {
+    let (kind, num) = decode(code)?;
 
     Ok(kind == 3)
 }
 
-pub fn is_sangen(code: u16) -> Result<bool> {
-    let (kind, num, _opt) = decode(code)?;
+pub fn is_sangen(code: u8) -> Result<bool> {
+    let (kind, num) = decode(code)?;
 
     Ok(kind == 3 && (5..7).contains(&num))
 }
 
-pub fn is_yao(code: u16) -> Result<bool> {
-    let (kind, num, _opt) = decode(code)?;
+pub fn is_yao(code: u8) -> Result<bool> {
+    let (kind, num) = decode(code)?;
 
     Ok(kind == 3 || num == 1 || num == 9)
 }
 
-pub fn is_tanyao(code: u16) -> Result<bool> {
+pub fn is_tanyao(code: u8) -> Result<bool> {
     Ok(!is_yao(code)?)
 }
 
-pub fn to_human_readable_string(code: u16) -> Result<String> {
+pub fn to_human_readable_string(code: u8) -> Result<String> {
     let kind_char = ['m', 'p', 's', 'z'];
-    let (kind, num, _opt) = decode(code)?;
+    let (kind, num) = decode(code)?;
 
     Ok(format!("{}{}", num, kind_char[kind as usize]))
 }
 
-fn char_to_kind(c: char) -> Result<u16> {
+fn char_to_kind(c: char) -> Result<u8> {
     let kind = match c {
         'm' => 0,
         'p' => 1,
@@ -89,10 +85,11 @@ fn char_to_kind(c: char) -> Result<u16> {
         'z' => 3,
         _ => bail!("Invalid character"),
     };
+
     Ok(kind)
 }
 
-pub fn from_human_readable_string(src: &str) -> Result<(Vec<u16>, u16)> {
+pub fn from_human_readable_string(src: &str) -> Result<(Vec<u8>, u8)> {
     if !src.is_ascii() {
         bail!("Invalid character");
     }
@@ -107,7 +104,7 @@ pub fn from_human_readable_string(src: &str) -> Result<(Vec<u16>, u16)> {
                 // skip
             }
             '1'..='9' => {
-                let num = b as u16 - '0' as u16;
+                let num = b - '0' as u8;
                 tmp.push(num);
             }
             _ => {
@@ -117,7 +114,7 @@ pub fn from_human_readable_string(src: &str) -> Result<(Vec<u16>, u16)> {
                     if kind == 3 {
                         ensure!(num <= 7, "Invalid zipai");
                     }
-                    let pai = encode(kind, num, 0).unwrap();
+                    let pai = encode(kind, num).unwrap();
                     result.push(pai);
                 }
                 tmp.clear();
@@ -185,14 +182,14 @@ impl MianziType {
 
 #[derive(Debug, Clone, Copy)]
 pub struct Mianzi {
-    pub pai: u16,
+    pub pai: u8,
     pub mtype: MianziType,
 }
 
 impl Mianzi {
     pub fn is_tanyao(&self) -> bool {
         if self.mtype.is_ordered() {
-            let (_kind, num, _opt) = decode(self.pai).unwrap();
+            let (_kind, num) = decode(self.pai).unwrap();
             num != 1 && num != 7
         } else {
             is_tanyao(self.pai).unwrap()
@@ -277,11 +274,10 @@ pub struct PointParam {
     ura: Vec<u8>,
 }
 
-pub fn to_bucket(dst: &mut [u8; PAI_COUNT], src: &[u16]) {
+pub fn to_bucket(dst: &mut [u8; PAI_COUNT], src: &[u8]) {
     dst.fill(0);
     for &pai in src {
-        let kindnum = pai & PAI_KINDNUM_MASK;
-        dst[kindnum as usize] += 1;
+        dst[pai as usize] += 1;
     }
 }
 
@@ -302,7 +298,7 @@ fn check_finish(pai1: u8, pai2: u8, finish_pai: u8, hand: &Hand) -> Option<Finis
             MianziType::SameRon
         };
         mianzi_list.push(Mianzi {
-            pai: finish_pai as u16,
+            pai: finish_pai,
             mtype,
         });
         return Some(FinishHand {
@@ -314,9 +310,9 @@ fn check_finish(pai1: u8, pai2: u8, finish_pai: u8, hand: &Hand) -> Option<Finis
         });
     }
 
-    let (k1, n1, _) = decode(pai1 as u16).unwrap();
-    let (k2, n2, _) = decode(pai1 as u16).unwrap();
-    let (kf, nf, _) = decode(pai1 as u16).unwrap();
+    let (k1, n1) = decode(pai1).unwrap();
+    let (k2, n2) = decode(pai1).unwrap();
+    let (kf, nf) = decode(pai1).unwrap();
     if k1 >= 3 {
         return None;
     }
@@ -436,13 +432,13 @@ fn finish_patterns(
             continue;
         }
 
-        let u16pai = pai as u16;
-        let (kind, num, _opt) = decode(u16pai)?;
+        let u8pai = pai as u8;
+        let (kind, num) = decode(u8pai)?;
 
         if hand.bucket[pai] >= 3 {
             hand.bucket[pai] -= 3;
             hand.mianzi_list.push(Mianzi {
-                pai: u16pai,
+                pai: u8pai,
                 mtype: MianziType::Same,
             });
             finish_patterns(tanki, hand, pai, result)?;
@@ -460,7 +456,7 @@ fn finish_patterns(
             hand.bucket[pai + 1] -= 1;
             hand.bucket[pai + 2] -= 1;
             hand.mianzi_list.push(Mianzi {
-                pai: u16pai,
+                pai: u8pai,
                 mtype: MianziType::Ordered,
             });
             finish_patterns(tanki, hand, pai, result)?;
@@ -474,7 +470,6 @@ fn finish_patterns(
     Ok(())
 }
 
-// TODO: treat ron as open triple
 fn calc_fu(hand: &FinishHand, param: &PointParam, menzen: bool) -> u32 {
     let mut fu = 20;
 
@@ -498,7 +493,7 @@ fn calc_fu(hand: &FinishHand, param: &PointParam, menzen: bool) -> u32 {
 
     {
         let mut tmp = 0;
-        let head = hand.head as u16;
+        let head = hand.head;
         if is_sangen(head).unwrap() || hand.head == param.self_wind {
             tmp += 2;
         }
@@ -550,8 +545,8 @@ mod tests {
                 if k == 3 && n > 7 {
                     continue;
                 }
-                let enc = encode(k, n, 0).unwrap();
-                let (kk, nn, _oo) = decode(enc).unwrap();
+                let enc = encode(k, n).unwrap();
+                let (kk, nn) = decode(enc).unwrap();
                 assert_eq!(k, kk);
                 assert_eq!(n, nn);
             }
@@ -568,10 +563,10 @@ mod tests {
                 if k == 3 && n > 7 {
                     continue;
                 }
-                assert!(hand.binary_search(&encode(k, n, 0).unwrap()).is_ok());
+                assert!(hand.binary_search(&encode(k, n).unwrap()).is_ok());
             }
         }
-        assert_eq!(last, encode(0, 1, 0).unwrap());
+        assert_eq!(last, encode(0, 1).unwrap());
 
         let hand = from_human_readable_string("あm");
         assert!(hand.is_err());
