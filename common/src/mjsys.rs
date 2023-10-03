@@ -182,8 +182,8 @@ impl MianziType {
 
 #[derive(Debug, Clone, Copy)]
 pub struct Mianzi {
-    pub pai: u8,
     pub mtype: MianziType,
+    pub pai: u8,
 }
 
 impl Mianzi {
@@ -298,8 +298,8 @@ fn check_finish(pai1: u8, pai2: u8, finish_pai: u8, hand: &Hand) -> Option<Finis
             MianziType::SameRon
         };
         mianzi_list.push(Mianzi {
-            pai: finish_pai,
             mtype,
+            pai: finish_pai,
         });
         return Some(FinishHand {
             finish_type: FinishType::Shabo,
@@ -322,8 +322,8 @@ fn check_finish(pai1: u8, pai2: u8, finish_pai: u8, hand: &Hand) -> Option<Finis
     if (n1 == 1 && n2 == 2 && nf == 3) || (nf == 7 && n1 == 8 && n2 == 9) {
         let mut mianzi_list = hand.mianzi_list.clone();
         mianzi_list.push(Mianzi {
-            pai: n1.min(nf),
             mtype: MianziType::Ordered,
+            pai: n1.min(nf),
         });
         Some(FinishHand {
             finish_type: FinishType::Penchan,
@@ -335,8 +335,8 @@ fn check_finish(pai1: u8, pai2: u8, finish_pai: u8, hand: &Hand) -> Option<Finis
     } else if n1 + 1 == nf && nf + 1 == n2 {
         let mut mianzi_list = hand.mianzi_list.clone();
         mianzi_list.push(Mianzi {
-            pai: n1,
             mtype: MianziType::Ordered,
+            pai: n1,
         });
         Some(FinishHand {
             finish_type: FinishType::Kanchan,
@@ -348,8 +348,8 @@ fn check_finish(pai1: u8, pai2: u8, finish_pai: u8, hand: &Hand) -> Option<Finis
     } else if (nf + 1 == n1 && n1 + 1 == nf) || (n1 + 1 == n2 && n2 + 1 == nf) {
         let mut mianzi_list = hand.mianzi_list.clone();
         mianzi_list.push(Mianzi {
-            pai: n1.min(nf),
             mtype: MianziType::Ordered,
+            pai: n1.min(nf),
         });
         Some(FinishHand {
             finish_type: FinishType::Ryanmen,
@@ -438,8 +438,8 @@ fn finish_patterns(
         if hand.bucket[pai] >= 3 {
             hand.bucket[pai] -= 3;
             hand.mianzi_list.push(Mianzi {
-                pai: u8pai,
                 mtype: MianziType::Same,
+                pai: u8pai,
             });
             finish_patterns(tanki, hand, pai, result)?;
             hand.mianzi_list.pop().unwrap();
@@ -456,8 +456,8 @@ fn finish_patterns(
             hand.bucket[pai + 1] -= 1;
             hand.bucket[pai + 2] -= 1;
             hand.mianzi_list.push(Mianzi {
-                pai: u8pai,
                 mtype: MianziType::Ordered,
+                pai: u8pai,
             });
             finish_patterns(tanki, hand, pai, result)?;
             hand.mianzi_list.pop().unwrap();

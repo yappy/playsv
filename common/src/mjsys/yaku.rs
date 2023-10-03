@@ -59,6 +59,19 @@ impl Yaku {
 }
 
 impl Yaku {
+    pub fn fan_sum(bits: u64) -> u32 {
+        let mut sum = 0;
+        let mut bit = 1u64;
+        while bit <= Yaku::YAKU_END.0 {
+            if bits & bit != 0 {
+                sum += Yaku(bit).fan();
+            }
+            bit <<= 1;
+        }
+
+        sum
+    }
+
     pub fn fan(&self) -> u32 {
         match *self {
             Self::REACH
@@ -246,18 +259,30 @@ pub fn check_yaku(hand: &FinishHand, param: &PointParam, menzen: bool) -> u64 {
         }
 
         // 2
+        {
+            let mut exist: [u8; 7] = Default::default();
+            for m in hand.mianzi_list.iter() {
+                if !super::is_ji(m.pai).unwrap() && m.mtype.is_ordered() {
+                    let (kind, num) = super::decode(m.pai).unwrap();
+                    exist[num as usize] |= 1 << kind;
+                }
+            }
+            if exist.iter().any(|&bits| bits == 0b111) {
+                yaku |= Yaku::DOJUN.0;
+            }
+        }
     }
 
     yaku
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::mjsys::*;
 
     #[test]
-    fn fan_all(){
+    fn fan_all() {
         let mut bit = 1u64;
         while bit <= Yaku::YAKU_END.0 {
             let fan = Yaku(bit).fan();
@@ -267,7 +292,7 @@ mod tests {
     }
 
     #[test]
-    fn japanese_all(){
+    fn japanese_all() {
         let mut bit = 1u64;
         while bit <= Yaku::YAKU_END.0 {
             let j = Yaku(bit).to_japanese_str();
@@ -276,4 +301,70 @@ mod tests {
         }
     }
 
+    // print japanese if
+    // cargo test --nocapture
+    #[test]
+    fn simple() {
+        let hand = FinishHand {
+            finish_type: FinishType::Ryanmen,
+            // 345m 345m 345p 345s
+            mianzi_list: vec![
+                Mianzi {
+                    mtype: MianziType::Ordered,
+                    pai: 2,
+                },
+                Mianzi {
+                    mtype: MianziType::Ordered,
+                    pai: 2,
+                },
+                Mianzi {
+                    mtype: MianziType::Ordered,
+                    pai: 11,
+                },
+                Mianzi {
+                    mtype: MianziType::Ordered,
+                    pai: 20,
+                },
+            ],
+            // 88m
+            head: 7,
+            finish_pai: 2,
+            tumo: true,
+        };
+        let param = PointParam {
+            field_wind: 0,
+            self_wind: 0,
+            reach: true,
+            reach_first: true,
+            chankan: false,
+            lingshang: false,
+            haitei: false,
+            houtei: false,
+            tenchi: false,
+            dora: vec![],
+            ura: vec![],
+        };
+        let menzen = true;
+
+        let expected = Yaku::REACH.0
+            | Yaku::IPPATSU.0
+            | Yaku::TSUMO.0
+            | Yaku::TANYAO.0
+            | Yaku::PINHU.0
+            | Yaku::DOJUN.0
+            | Yaku::IPEKO.0;
+
+        // add pinhu manually
+        let yaku_list = check_yaku(&hand, &param, menzen) | Yaku::PINHU.0;
+        assert_eq!(expected, yaku_list);
+        assert_eq!(8, Yaku::fan_sum(yaku_list));
+
+        let mut bit = 1u64;
+        while bit <= Yaku::YAKU_END.0 {
+            if yaku_list & bit != 0 {
+                println!("{}", Yaku(bit).to_japanese_str());
+            }
+            bit <<= 1;
+        }
+    }
 }
