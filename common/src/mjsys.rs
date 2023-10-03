@@ -12,6 +12,8 @@ Encoding:
 ji   : 27-33
 */
 
+mod yaku;
+
 use anyhow::{bail, ensure, Result};
 
 const PAI_COUNT: usize = 34;
@@ -90,7 +92,7 @@ fn char_to_kind(c: char) -> Result<u16> {
     Ok(kind)
 }
 
-pub fn from_human_readable_string(src: &str) -> Result<Vec<u16>> {
+pub fn from_human_readable_string(src: &str) -> Result<(Vec<u16>, u16)> {
     if !src.is_ascii() {
         bail!("Invalid character");
     }
@@ -101,6 +103,9 @@ pub fn from_human_readable_string(src: &str) -> Result<Vec<u16>> {
     for &b in src.as_bytes() {
         let c = b as char;
         match c {
+            c if c.is_ascii_whitespace() => {
+                // skip
+            }
             '1'..='9' => {
                 let num = b as u16 - '0' as u16;
                 tmp.push(num);
@@ -122,9 +127,13 @@ pub fn from_human_readable_string(src: &str) -> Result<Vec<u16>> {
     if !tmp.is_empty() {
         bail!("Ended with a number");
     }
+    if result.is_empty() {
+        bail!("Empty");
+    }
+    let last = result.pop().unwrap();
     result.sort();
 
-    Ok(result)
+    Ok((result, last))
 }
 
 // /////////////////////////////////////////////////////////////////////////////
@@ -134,6 +143,8 @@ pub enum MianziType {
     Ordered,
     OrderedChi,
     Same,
+    // menzen Ron, but calc fu and yaku as Pon
+    SameRon,
     SamePon,
     // (gang)
     SameKanBlind,
@@ -151,6 +162,13 @@ impl MianziType {
 
     pub fn is_same(&self) -> bool {
         !self.is_ordered()
+    }
+
+    pub fn is_menzen(&self) -> bool {
+        match self {
+            Self::Ordered | Self::Same | Self::SameRon | Self::SameKanBlind => true,
+            _ => false,
+        }
     }
 
     pub fn is_blind(&self) -> bool {
@@ -190,6 +208,7 @@ pub struct Hand {
     mianzi_list: Vec<Mianzi>,
     head: Option<u8>,
     finish_pai: u8,
+    tumo: bool,
 }
 
 impl Default for Hand {
@@ -199,56 +218,39 @@ impl Default for Hand {
             mianzi_list: Default::default(),
             head: None,
             finish_pai: 0,
+            tumo: true,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum FinishType {
+    Ryanmen,
+    Kanchan,
+    Penchan,
+    Shabo,
+    Tanki,
+}
+
+impl FinishType {
+    pub fn fu(&self) -> u32 {
+        match self {
+            FinishType::Ryanmen | FinishType::Shabo => 0,
+            FinishType::Kanchan | FinishType::Penchan | FinishType::Tanki => 2,
         }
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct FinishHand {
+    finish_type: FinishType,
+    // if not tanki, the last element includes finish_pai
     mianzi_list: Vec<Mianzi>,
+    // if tanki, head = finish_pai
     head: u8,
     finish_pai: u8,
+    tumo: bool,
 }
-
-// https://ja.wikipedia.org/wiki/%E9%BA%BB%E9%9B%80%E3%81%AE%E5%BD%B9%E4%B8%80%E8%A6%A7
-pub const YAKU10_REACH: u64 = 0;
-pub const YAKU10_IPPATSU: u64 = 0;
-pub const YAKU10_TSUMO: u64 = 0;
-pub const YAKU11_TANYAO: u64 = 0;
-pub const YAKU10_PINHU: u64 = 0;
-pub const YAKU10_IPEKO: u64 = 0;
-pub const YAKU11_YAKU_E: u64 = 0;
-pub const YAKU11_YAKU_S: u64 = 0;
-pub const YAKU11_YAKU_W: u64 = 0;
-pub const YAKU11_YAKU_N: u64 = 0;
-pub const YAKU11_YAKU_P: u64 = 0;
-pub const YAKU11_YAKU_H: u64 = 0;
-pub const YAKU11_YAKU_C: u64 = 0;
-pub const YAKU11_RINSHAN: u64 = 0;
-pub const YAKU11_CHANKAN: u64 = 0;
-pub const YAKU11_HAITEI: u64 = 0;
-pub const YAKU11_HOTEI: u64 = 0;
-
-pub const YAKU21_3CDOJUN: u64 = 0;
-pub const YAKU21_ITTSU: u64 = 0;
-pub const YAKU21_CHANTA: u64 = 0;
-pub const YAKU20_CHITOI: u64 = 0;
-pub const YAKU22_TOITOI: u64 = 0;
-pub const YAKU22_SANANKO: u64 = 0;
-pub const YAKU22_HONRO: u64 = 0;
-pub const YAKU22_3CDOKO: u64 = 0;
-pub const YAKU22_SANKAN: u64 = 0;
-pub const YAKU22_SHOSANGEN: u64 = 0;
-pub const YAKU20_DBLREACH: u64 = 0;
-
-pub const YAKU32_HON: u64 = 0;
-pub const YAKU32_JUNCHAN: u64 = 0;
-pub const YAKU30_LIANGPEKO: u64 = 0;
-
-pub const YAKU65_CHIN: u64 = 0;
-
-// TODO:
-// Nagashi-Mangan, Renho, Sanrenko, Surenko, Daisharin, Parenchan
 
 pub struct Point {
     // YAKU*
@@ -264,7 +266,6 @@ pub struct PointParam {
     field_wind: u8,
     // 0, 1, 2, 3; Parent if 0
     self_wind: u8,
-    tumo: bool,
     reach: bool,
     reach_first: bool,
     chanlan: bool,
@@ -284,17 +285,101 @@ pub fn to_bucket(dst: &mut [u8; PAI_COUNT], src: &[u16]) {
     }
 }
 
-pub fn all_finish_patterns(
+pub fn all_finish_patterns(hand: &mut Hand, result: &mut Vec<FinishHand>) -> Result<()> {
+    finish_patterns(false, hand, 0, result)?;
+    finish_patterns(true, hand, 0, result)?;
+
+    Ok(())
+}
+
+fn check_finish(pai1: u8, pai2: u8, finish_pai: u8, hand: &Hand) -> Option<FinishHand> {
+    if pai1 == pai2 && pai2 == finish_pai {
+        let mut mianzi_list = hand.mianzi_list.clone();
+        let mtype = if hand.tumo {
+            MianziType::Same
+        } else {
+            // if Ron, can keep menzen but treat fu/fan as Pon
+            MianziType::SameRon
+        };
+        mianzi_list.push(Mianzi {
+            pai: finish_pai as u16,
+            mtype,
+        });
+        return Some(FinishHand {
+            finish_type: FinishType::Shabo,
+            mianzi_list,
+            head: hand.head.unwrap(),
+            finish_pai,
+            tumo: hand.tumo,
+        });
+    }
+
+    let (k1, n1, _) = decode(pai1 as u16).unwrap();
+    let (k2, n2, _) = decode(pai1 as u16).unwrap();
+    let (kf, nf, _) = decode(pai1 as u16).unwrap();
+    if k1 >= 3 {
+        return None;
+    }
+    if k1 != k2 || k2 != kf {
+        return None;
+    }
+    if (n1 == 1 && n2 == 2 && nf == 3) || (nf == 7 && n1 == 8 && n2 == 9) {
+        let mut mianzi_list = hand.mianzi_list.clone();
+        mianzi_list.push(Mianzi {
+            pai: n1.min(nf),
+            mtype: MianziType::Ordered,
+        });
+        Some(FinishHand {
+            finish_type: FinishType::Penchan,
+            mianzi_list,
+            head: hand.head.unwrap(),
+            finish_pai,
+            tumo: hand.tumo,
+        })
+    } else if n1 + 1 == nf && nf + 1 == n2 {
+        let mut mianzi_list = hand.mianzi_list.clone();
+        mianzi_list.push(Mianzi {
+            pai: n1,
+            mtype: MianziType::Ordered,
+        });
+        Some(FinishHand {
+            finish_type: FinishType::Kanchan,
+            mianzi_list,
+            head: hand.head.unwrap(),
+            finish_pai,
+            tumo: hand.tumo,
+        })
+    } else if (nf + 1 == n1 && n1 + 1 == nf) || (n1 + 1 == n2 && n2 + 1 == nf) {
+        let mut mianzi_list = hand.mianzi_list.clone();
+        mianzi_list.push(Mianzi {
+            pai: n1.min(nf),
+            mtype: MianziType::Ordered,
+        });
+        Some(FinishHand {
+            finish_type: FinishType::Ryanmen,
+            mianzi_list,
+            head: hand.head.unwrap(),
+            finish_pai,
+            tumo: hand.tumo,
+        })
+    } else {
+        None
+    }
+}
+
+fn finish_patterns(
+    tanki: bool,
     hand: &mut Hand,
     start: usize,
     result: &mut Vec<FinishHand>,
 ) -> Result<()> {
-    if hand.head.is_none() {
+    // if not tanki, decide head at first
+    if !tanki && hand.head.is_none() {
         for pai in 0..PAI_COUNT {
             if hand.bucket[pai] >= 2 {
                 hand.bucket[pai] -= 2;
                 hand.head = Some(pai as u8);
-                all_finish_patterns(hand, start, result)?;
+                finish_patterns(tanki, hand, start, result)?;
                 hand.head = None;
                 hand.bucket[pai] += 2;
             }
@@ -302,15 +387,48 @@ pub fn all_finish_patterns(
         return Ok(());
     }
 
-    // head is already decided!
-
-    if hand.mianzi_list.len() == 4 {
-        ensure!(hand.bucket.iter().sum::<u8>() == 0);
-        result.push(FinishHand {
-            mianzi_list: hand.mianzi_list.clone(),
-            head: hand.head.unwrap(),
-            finish_pai: hand.finish_pai,
-        });
+    if tanki {
+        if hand.mianzi_list.len() == 4 {
+            ensure!(hand.bucket.iter().sum::<u8>() == 1);
+            let (pai, _) = hand
+                .bucket
+                .iter()
+                .enumerate()
+                .find(|(_i, &x)| x > 0)
+                .unwrap();
+            let pai = pai as u8;
+            if hand.finish_pai == pai {
+                result.push(FinishHand {
+                    finish_type: FinishType::Tanki,
+                    mianzi_list: hand.mianzi_list.clone(),
+                    head: pai,
+                    finish_pai: hand.finish_pai,
+                    tumo: hand.tumo,
+                })
+            }
+        }
+    } else {
+        if hand.mianzi_list.len() == 3 {
+            ensure!(hand.bucket.iter().sum::<u8>() == 2);
+            let (pai, &count) = hand
+                .bucket
+                .iter()
+                .enumerate()
+                .find(|(_i, &x)| x > 0)
+                .unwrap();
+            let pai1 = pai as u8;
+            let pai2 = if count >= 2 {
+                pai1
+            } else {
+                let rest = &hand.bucket[pai..];
+                let (pai, &count) = rest.iter().enumerate().find(|(_i, &x)| x > 0).unwrap();
+                pai as u8
+            };
+            let fin = check_finish(pai1, pai2, hand.finish_pai, hand);
+            if fin.is_some() {
+                result.push(fin.unwrap());
+            }
+        }
     }
 
     for pai in start..PAI_COUNT {
@@ -327,7 +445,7 @@ pub fn all_finish_patterns(
                 pai: u16pai,
                 mtype: MianziType::Same,
             });
-            all_finish_patterns(hand, pai, result)?;
+            finish_patterns(tanki, hand, pai, result)?;
             hand.mianzi_list.pop().unwrap();
             hand.bucket[pai] += 3;
         }
@@ -345,7 +463,7 @@ pub fn all_finish_patterns(
                 pai: u16pai,
                 mtype: MianziType::Ordered,
             });
-            all_finish_patterns(hand, pai, result)?;
+            finish_patterns(tanki, hand, pai, result)?;
             hand.mianzi_list.pop().unwrap();
             hand.bucket[pai + 2] += 1;
             hand.bucket[pai + 1] += 1;
@@ -356,42 +474,16 @@ pub fn all_finish_patterns(
     Ok(())
 }
 
-fn create_yaku_list(hand: &FinishHand, param: &PointParam, menzen: bool) -> u64 {
-    let mut yaku = 0;
-
-    if param.reach {
-        yaku |= YAKU10_REACH;
-        if param.reach_first {
-            yaku |= YAKU10_IPPATSU;
-        }
-    }
-    if menzen && param.tumo {
-        yaku |= YAKU10_TSUMO;
-    }
-    {
-        let tan1 = hand.mianzi_list.iter().all(|m| m.is_tanyao());
-        let tan2 = is_tanyao(hand.head as u16).unwrap();
-        if tan1 && tan2 {
-            yaku|= YAKU11_TANYAO;
-        }
-    }
-    // PINHU: check after fu
-
-    yaku
-}
-
 // TODO: treat ron as open triple
-fn calc_fu(hand: &FinishHand, param: &PointParam, menzen: bool) -> (u32, u32) {
+fn calc_fu(hand: &FinishHand, param: &PointParam, menzen: bool) -> u32 {
     let mut fu = 20;
-    let mut wait0 = false;
-    let mut wait2 = false;
 
+    // mianzi
     for &m in hand.mianzi_list.iter() {
-        // mianzi
         let mut tmp = match m.mtype {
             MianziType::Ordered | MianziType::OrderedChi => 0,
             MianziType::Same => 4,
-            MianziType::SamePon => 2,
+            MianziType::SamePon | MianziType::SameRon => 2,
             MianziType::SameKanBlind => 16,
             MianziType::SameKanOpen => 8,
         };
@@ -399,36 +491,9 @@ fn calc_fu(hand: &FinishHand, param: &PointParam, menzen: bool) -> (u32, u32) {
             tmp *= 2;
         }
         fu += tmp;
-
-        // wait
-        let (kind, num, _opt) = decode(m.pai).unwrap();
-        let (fkind, fnum, _opt) = decode(hand.finish_pai as u16).unwrap();
-        if m.mtype.is_ordered() && kind == fkind {
-            // penchan
-            if (num == 1 && fnum == 3) || (num == 7 && fnum == 7) {
-                wait2 = true;
-            }
-            // kanchan
-            if num + 1 == fnum {
-                wait2 = true;
-            }
-            // ryanmen
-            if num == fnum || num + 2 == fnum {
-                wait0 = true;
-            }
-        }
-        if m.mtype.is_same() && kind == fkind {
-            // shabo
-            if num == fnum {
-                wait0 = true;
-            }
-        }
     }
     {
-        // can be treated as tanki
-        if hand.head == hand.finish_pai {
-            wait2 = true;
-        }
+        //wait
     }
 
     {
@@ -444,7 +509,7 @@ fn calc_fu(hand: &FinishHand, param: &PointParam, menzen: bool) -> (u32, u32) {
         fu += 2;
     }
 
-    if param.tumo {
+    if hand.tumo {
         fu += 2;
     } else if menzen {
         fu += 10;
@@ -454,18 +519,24 @@ fn calc_fu(hand: &FinishHand, param: &PointParam, menzen: bool) -> (u32, u32) {
         fu = 30;
     }
 
-    assert!(wait0 || wait2);
-    let fu_min = if wait0 { fu } else { fu + 2 };
-    let fu_max = if wait2 { fu + 2 } else { fu };
-
-    (fu_min, fu_max)
+    fu
 }
 
-pub fn calc_point(hand: &FinishHand, param: &PointParam) {
-    let menzen = hand.mianzi_list.iter().all(|m| m.mtype.is_blind());
+pub fn calc_point(hand: &FinishHand, param: &PointParam) -> Point {
+    let menzen = hand.mianzi_list.iter().all(|m| m.mtype.is_menzen());
 
-    let yaku = create_yaku_list(hand, param);
-    let (fu_min, fu_max) = calc_fu(hand, param, menzen);
+    let mut yaku = yaku::check_yaku(hand, param, menzen);
+    let fu = calc_fu(hand, param, menzen);
+    if menzen && fu == 20 {
+        yaku |= yaku::Yaku::PINHU.0;
+    }
+
+    Point {
+        yaku,
+        fu,
+        fan: 0,
+        point: 0,
+    }
 }
 
 #[cfg(test)]
@@ -489,7 +560,8 @@ mod tests {
 
     #[test]
     fn parse_human_readable() {
-        let hand = from_human_readable_string("123456789m123456789p123456789s1234567z").unwrap();
+        let (hand, last) =
+            from_human_readable_string("123456789m123456789p123456789s1234567z1m").unwrap();
 
         for k in 0..4 {
             for n in 1..10 {
@@ -499,6 +571,7 @@ mod tests {
                 assert!(hand.binary_search(&encode(k, n, 0).unwrap()).is_ok());
             }
         }
+        assert_eq!(last, encode(0, 1, 0).unwrap());
 
         let hand = from_human_readable_string("あm");
         assert!(hand.is_err());
@@ -512,18 +585,20 @@ mod tests {
 
     #[test]
     fn enum_hand() {
-        let src = from_human_readable_string("111999m111999p11s").unwrap();
+        let (src, fin) = from_human_readable_string("111999m111999p1s 1s").unwrap();
         let mut hand: Hand = Default::default();
+        hand.finish_pai = fin as u8;
         let mut result = Vec::new();
         to_bucket(&mut hand.bucket, &src);
-        all_finish_patterns(&mut hand, 0, &mut result).unwrap();
+        all_finish_patterns(&mut hand, &mut result).unwrap();
         assert_eq!(result.len(), 1);
 
-        let src = from_human_readable_string("123789m123789p11s").unwrap();
+        let (src, fin) = from_human_readable_string("123789m123789p1s 1s").unwrap();
         let mut hand: Hand = Default::default();
+        hand.finish_pai = fin as u8;
         let mut result = Vec::new();
         to_bucket(&mut hand.bucket, &src);
-        all_finish_patterns(&mut hand, 0, &mut result).unwrap();
+        all_finish_patterns(&mut hand, &mut result).unwrap();
         assert_eq!(result.len(), 1);
     }
 }
