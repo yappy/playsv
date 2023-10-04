@@ -58,6 +58,8 @@ impl Yaku {
     pub const YAKU_END: Self = Self::YAKU5_CHIN_N;
 }
 
+// TODO: YAKUMAN
+
 impl Yaku {
     pub fn fan_sum(bits: u64) -> u32 {
         let mut sum = 0;
@@ -119,6 +121,20 @@ impl Yaku {
         }
     }
 
+    pub fn to_japanese_list(bits: u64) -> Vec<&'static str> {
+        let mut result = Vec::new();
+
+        let mut bit = 1u64;
+        while bit <= Yaku::YAKU_END.0 {
+            if bits & bit != 0 {
+                result.push(Yaku(bit).to_japanese_str());
+            }
+            bit <<= 1;
+        }
+
+        result
+    }
+
     pub fn to_japanese_str(&self) -> &'static str {
         // https://ja.wikipedia.org/wiki/%E9%BA%BB%E9%9B%80%E3%81%AE%E5%BD%B9%E4%B8%80%E8%A6%A7
         match *self {
@@ -136,9 +152,9 @@ impl Yaku {
             Self::SELF_S => "自風牌・南",
             Self::SELF_W => "自風牌・西",
             Self::SELF_N => "自風牌・北",
-            Self::YAKU_HAKU => "役牌",
-            Self::YAKU_HATSU => "役牌",
-            Self::YAKU_CHUN => "役牌",
+            Self::YAKU_HAKU => "役牌・白",
+            Self::YAKU_HATSU => "役牌・發",
+            Self::YAKU_CHUN => "役牌・中",
             Self::RINSHAN => "嶺上開花",
             Self::CHANKAN => "搶槓",
             Self::HAITEI => "海底摸月",
@@ -264,11 +280,90 @@ pub fn check_yaku(hand: &FinishHand, param: &PointParam, menzen: bool) -> u64 {
             for m in hand.mianzi_list.iter() {
                 if !super::is_ji(m.pai).unwrap() && m.mtype.is_ordered() {
                     let (kind, num) = super::decode(m.pai).unwrap();
+                    let num = num - 1;
                     exist[num as usize] |= 1 << kind;
                 }
             }
             if exist.iter().any(|&bits| bits == 0b111) {
-                yaku |= Yaku::DOJUN.0;
+                yaku |= if menzen {
+                    Yaku::DOJUN.0
+                } else {
+                    Yaku::DOJUN_N.0
+                };
+            }
+        }
+        {
+            let mut exist: [[bool; 7]; 3] = Default::default();
+            for m in hand.mianzi_list.iter() {
+                if !super::is_ji(m.pai).unwrap() && m.mtype.is_ordered() {
+                    let (kind, num) = super::decode(m.pai).unwrap();
+                    let num = num - 1;
+                    exist[kind as usize][num as usize] = true;
+                }
+            }
+            if exist.iter().any(|&nums| nums[0] && nums[3] && nums[6]) {
+                yaku |= if menzen {
+                    Yaku::ITTSU.0
+                } else {
+                    Yaku::ITTSU_N.0
+                };
+            }
+        }
+        {
+            let yes1 = hand.mianzi_list.iter().all(|m| m.is_chanta());
+            let yes2 = super::is_yao(hand.head).unwrap();
+            if yes1 && yes2 {
+                yaku |= if menzen {
+                    Yaku::CHANTA.0
+                } else {
+                    Yaku::CHANTA_N.0
+                };
+            }
+        }
+        // CHITOI: check other routine
+        {
+            let yes = hand.mianzi_list.iter().all(|m| m.mtype.is_same());
+            if yes {
+                yaku |= Yaku::TOITOI.0;
+            }
+        }
+        {
+            let count = hand
+                .mianzi_list
+                .iter()
+                .filter(|m| m.mtype.is_same() && m.mtype.is_blind())
+                .count();
+            if count >= 3 {
+                yaku |= Yaku::SANANKO.0;
+            }
+        }
+        {
+            let yes1 = hand
+                .mianzi_list
+                .iter()
+                .all(|m| m.mtype.is_same() && m.is_chanta());
+            let yes2 = super::is_yao(hand.head).unwrap();
+            if yes1 && yes2 {
+                yaku |= Yaku::HONRO.0;
+            }
+        }
+        {
+            let mut exist: [u8; 9] = Default::default();
+            for m in hand.mianzi_list.iter() {
+                if !super::is_ji(m.pai).unwrap() && m.mtype.is_same() {
+                    let (kind, num) = super::decode(m.pai).unwrap();
+                    let num = num - 1;
+                    exist[num as usize] |= 1 << kind;
+                }
+            }
+            if exist.iter().any(|&bits| bits == 0b111) {
+                yaku |= Yaku::DOKO.0;
+            }
+        }
+        {
+            let count = hand.mianzi_list.iter().filter(|m| m.mtype.is_kan()).count();
+            if count >= 3 {
+                yaku |= Yaku::SANKAN.0;
             }
         }
     }
@@ -304,26 +399,26 @@ mod tests {
     // print japanese if
     // cargo test --nocapture
     #[test]
-    fn simple() {
+    fn basic_1fan() {
         let hand = FinishHand {
             finish_type: FinishType::Ryanmen,
-            // 345m 345m 345p 345s
+            // 234m 234m 456p 678s
             mianzi_list: vec![
                 Mianzi {
                     mtype: MianziType::Ordered,
-                    pai: 2,
+                    pai: encode(0, 2).unwrap(),
                 },
                 Mianzi {
                     mtype: MianziType::Ordered,
-                    pai: 2,
+                    pai: encode(0, 2).unwrap(),
                 },
                 Mianzi {
                     mtype: MianziType::Ordered,
-                    pai: 11,
+                    pai: encode(1, 4).unwrap(),
                 },
                 Mianzi {
                     mtype: MianziType::Ordered,
-                    pai: 20,
+                    pai: encode(2, 6).unwrap(),
                 },
             ],
             // 88m
@@ -351,20 +446,13 @@ mod tests {
             | Yaku::TSUMO.0
             | Yaku::TANYAO.0
             | Yaku::PINHU.0
-            | Yaku::DOJUN.0
             | Yaku::IPEKO.0;
 
         // add pinhu manually
         let yaku_list = check_yaku(&hand, &param, menzen) | Yaku::PINHU.0;
         assert_eq!(expected, yaku_list);
-        assert_eq!(8, Yaku::fan_sum(yaku_list));
+        assert_eq!(6, Yaku::fan_sum(yaku_list));
 
-        let mut bit = 1u64;
-        while bit <= Yaku::YAKU_END.0 {
-            if yaku_list & bit != 0 {
-                println!("{}", Yaku(bit).to_japanese_str());
-            }
-            bit <<= 1;
-        }
+        println!("{:?}", Yaku::to_japanese_list(yaku_list));
     }
 }

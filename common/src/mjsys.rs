@@ -49,9 +49,13 @@ pub fn encode(kind: u8, num: u8) -> Result<u8> {
 }
 
 pub fn is_ji(code: u8) -> Result<bool> {
-    let (kind, num) = decode(code)?;
+    let (kind, _num) = decode(code)?;
 
     Ok(kind == 3)
+}
+
+pub fn is_num(code: u8) -> Result<bool> {
+    Ok(!is_ji(code)?)
 }
 
 pub fn is_sangen(code: u8) -> Result<bool> {
@@ -151,10 +155,7 @@ pub enum MianziType {
 
 impl MianziType {
     pub fn is_ordered(&self) -> bool {
-        match self {
-            Self::Ordered | Self::OrderedChi => true,
-            _ => false,
-        }
+        matches!(self, Self::Ordered | Self::OrderedChi)
     }
 
     pub fn is_same(&self) -> bool {
@@ -162,21 +163,22 @@ impl MianziType {
     }
 
     pub fn is_menzen(&self) -> bool {
-        match self {
-            Self::Ordered | Self::Same | Self::SameRon | Self::SameKanBlind => true,
-            _ => false,
-        }
+        matches!(
+            self,
+            Self::Ordered | Self::Same | Self::SameRon | Self::SameKanBlind
+        )
     }
 
     pub fn is_blind(&self) -> bool {
-        match self {
-            Self::Ordered | Self::Same | Self::SameKanBlind => true,
-            _ => false,
-        }
+        matches!(self, Self::Ordered | Self::Same | Self::SameKanBlind)
     }
 
     pub fn is_open(&self) -> bool {
         !self.is_blind()
+    }
+
+    pub fn is_kan(&self) -> bool {
+        matches!(self, Self::SameKanBlind | Self::SameKanOpen)
     }
 }
 
@@ -194,6 +196,9 @@ impl Mianzi {
         } else {
             is_tanyao(self.pai).unwrap()
         }
+    }
+    pub fn is_chanta(&self) -> bool {
+        !self.is_tanyao()
     }
 }
 
