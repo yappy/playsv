@@ -390,6 +390,78 @@ pub fn check_yaku(hand: &FinishHand, param: &PointParam, menzen: bool) -> u64 {
         yaku |= Yaku::DBLREACH.0;
     }
 
+    // 3
+    {
+        let mut yes = true;
+        let mut color: Option<u8> = None;
+        for m in hand
+            .mianzi_list
+            .iter()
+            .filter(|m| !super::is_ji(m.pai).unwrap())
+        {
+            let (kind, _num) = super::decode(m.pai).unwrap();
+            if color != Some(kind) {
+                yes = false;
+                break;
+            }
+            color = Some(kind);
+        }
+        if !super::is_ji(hand.head).unwrap() {
+            let (kind, _num) = super::decode(hand.head).unwrap();
+            if color != Some(kind) {
+                yes = false;
+            }
+        }
+        if yes {
+            yaku |= if menzen { Yaku::HON.0 } else { Yaku::HON_N.0 };
+        }
+    }
+    {
+        let yes1 = hand.mianzi_list.iter().all(|m| m.is_junchan());
+        let yes2 = super::is_jun(hand.head).unwrap();
+        if yes1 && yes2 {
+            yaku |= if menzen {
+                Yaku::JUNCHAN.0
+            } else {
+                Yaku::JUNCHAN_N.0
+            };
+        }
+    }
+    if menzen {
+        let pat_list = [
+            (0, 1, 2, 3),
+            (0, 2, 1, 3),
+            (0, 3, 1, 2),
+            (1, 2, 0, 3),
+            (1, 3, 0, 2),
+            (2, 3, 0, 1),
+        ];
+        for (i1, i2, i3, i4) in pat_list {
+            let m1 = hand.mianzi_list[i1];
+            let m2 = hand.mianzi_list[i2];
+            let m3 = hand.mianzi_list[i3];
+            let m4 = hand.mianzi_list[i4];
+            let yes1 = m1.mtype.is_ordered() && m2.mtype.is_ordered() && m1.pai == m2.pai;
+            let yes2 = m3.mtype.is_ordered() && m4.mtype.is_ordered() && m3.pai == m4.pai;
+            if yes1 && yes2 {
+                yaku |= Yaku::LIANGPEKO.0;
+                break;
+            }
+        }
+    }
+
+    // 6
+    if !super::is_ji(hand.head).unwrap() {
+        let (color, _num) = super::decode(hand.head).unwrap();
+        let yes = hand.mianzi_list.iter().all(|m| {
+            let (kind, _num) = super::decode(m.pai).unwrap();
+            kind == color
+        });
+        if yes {
+            yaku |= if menzen { Yaku::CHIN.0 } else { Yaku::CHIN_N.0 };
+        }
+    }
+
     normalize_yaku(yaku)
 }
 

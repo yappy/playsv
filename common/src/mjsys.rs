@@ -70,6 +70,12 @@ pub fn is_yao(code: u8) -> Result<bool> {
     Ok(kind == 3 || num == 1 || num == 9)
 }
 
+pub fn is_jun(code: u8) -> Result<bool> {
+    let (kind, num) = decode(code)?;
+
+    Ok(kind < 3 && (num == 1 || num == 9))
+}
+
 pub fn is_tanyao(code: u8) -> Result<bool> {
     Ok(!is_yao(code)?)
 }
@@ -197,8 +203,18 @@ impl Mianzi {
             is_tanyao(self.pai).unwrap()
         }
     }
+
     pub fn is_chanta(&self) -> bool {
         !self.is_tanyao()
+    }
+
+    pub fn is_junchan(&self) -> bool {
+        let (kind, num) = decode(self.pai).unwrap();
+        if self.mtype.is_ordered() {
+            num == 1 || num == 7
+        } else {
+            kind < 3 && (num == 1 || num == 9)
+        }
     }
 }
 
