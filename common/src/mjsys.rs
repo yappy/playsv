@@ -262,13 +262,20 @@ pub struct Point {
     point: u32,
 }
 
+#[derive(PartialEq)]
+pub enum Reach {
+    None,
+    Single,
+    Double,
+}
+
 // ref. https://blog.kobalab.net/entry/20151221/1450624780
 pub struct PointParam {
     // 0, 1, 2, 3
     field_wind: u8,
     // 0, 1, 2, 3; Parent if 0
     self_wind: u8,
-    reach: bool,
+    reach: Reach,
     reach_first: bool,
     chankan: bool,
     lingshang: bool,
