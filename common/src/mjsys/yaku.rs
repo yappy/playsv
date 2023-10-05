@@ -135,9 +135,9 @@ impl Yaku {
         result
     }
 
-    pub fn to_japanese_str(&self) -> &'static str {
+    pub fn to_japanese_str(self) -> &'static str {
         // https://ja.wikipedia.org/wiki/%E9%BA%BB%E9%9B%80%E3%81%AE%E5%BD%B9%E4%B8%80%E8%A6%A7
-        match *self {
+        match self {
             Self::REACH => "立直",
             Self::IPPATSU => "一発",
             Self::TSUMO => "門前清自摸和",
@@ -211,10 +211,8 @@ pub fn check_yaku(hand: &FinishHand, param: &PointParam, menzen: bool) -> u64 {
         let mut yes = false;
         for (i1, m1) in hand.mianzi_list.iter().enumerate() {
             for (i2, m2) in hand.mianzi_list.iter().enumerate() {
-                if i1 != i2 && m1.mtype.is_ordered() && m2.mtype.is_ordered() {
-                    if m1.pai == m2.pai {
-                        yes = true;
-                    }
+                if i1 != i2 && m1.mtype.is_ordered() && m2.mtype.is_ordered() && m1.pai == m2.pai {
+                    yes = true;
                 }
             }
         }

@@ -132,7 +132,7 @@ pub fn from_human_readable_string(src: &str) -> Result<Hand> {
                 fulou = Some(MianziType::SameKanOpen);
             }
             '1'..='9' => {
-                let num = b - '0' as u8;
+                let num = b - b'0';
                 num_list.push(num);
             }
             _ => {
@@ -146,7 +146,7 @@ pub fn from_human_readable_string(src: &str) -> Result<Hand> {
                         }
                     }
                     Some(mtype) => {
-                        let num = *num_list.get(0).ok_or(anyhow!("Invalid fulou"))?;
+                        let num = *num_list.first().ok_or(anyhow!("Invalid fulou"))?;
                         let pai = encode(kind, num)?;
                         let m = Mianzi { mtype, pai };
                         hand.mianzi_list.push(m);
@@ -454,7 +454,7 @@ fn check_finish(pai1: u8, pai2: u8, finish_pai: u8, hand: &Hand) -> Option<Finis
             finish_pai,
             tumo: hand.tumo,
         })
-    } else if (nf + 1 == n1 && n1 + 1 == n2) || (n1 + 1 == n2 && n2 + 1 == nf) {
+    } else if n1 + 1 == n2 && (nf + 1 == n1 || n2 + 1 == nf) {
         let mut mianzi_list = hand.mianzi_list.clone();
         mianzi_list.push(Mianzi {
             mtype: MianziType::Ordered,
@@ -492,6 +492,7 @@ fn finish_patterns(
         return Ok(());
     }
     // the last part
+    #[allow(clippy::collapsible_else_if)]
     if tanki {
         if hand.mianzi_list.len() == 4 {
             ensure!(hand.bucket.iter().sum::<u8>() == 1);
@@ -527,19 +528,19 @@ fn finish_patterns(
                 pai1
             } else {
                 let rest = &hand.bucket[pai1 as usize + 1..];
-                let (pai2, _) = rest.iter().enumerate().find(|(i, &x)| x > 0).unwrap();
+                let (pai2, _) = rest.iter().enumerate().find(|(_i, &x)| x > 0).unwrap();
                 (pai1 + 1) + (pai2 as u8)
             };
             if let Some(finish_pai) = hand.finish_pai {
                 let fin = check_finish(pai1, pai2, finish_pai, hand);
-                if fin.is_some() {
-                    result.push(fin.unwrap());
+                if let Some(fin) = fin {
+                    result.push(fin);
                 }
             } else {
                 for finish_pai in 0..(PAI_COUNT as u8) {
                     let fin = check_finish(pai1, pai2, finish_pai, hand);
-                    if fin.is_some() {
-                        result.push(fin.unwrap());
+                    if let Some(fin) = fin {
+                        result.push(fin);
                     }
                 }
             }
@@ -704,7 +705,7 @@ pub fn calc_point_p_ron(base_point: u32) -> u32 {
 pub fn calc_point_c_tumo(base_point: u32) -> (u32, u32) {
     assert!(base_point <= 2000);
 
-    (roundup100(base_point * 1), roundup100(base_point * 2))
+    (roundup100(base_point), roundup100(base_point * 2))
 }
 
 pub fn calc_point_c_ron(base_point: u32) -> u32 {
