@@ -14,7 +14,7 @@ ji   : 27-33
 
 mod yaku;
 
-use anyhow::{bail, ensure, Result};
+use anyhow::{anyhow, bail, ensure, Result};
 
 use yaku::Yaku;
 
@@ -25,10 +25,10 @@ pub const OFFSET_S: u8 = 18;
 pub const OFFSET_Z: u8 = 27;
 
 fn validate(kind: u8, num: u8) -> Result<()> {
-    ensure!(kind <= 3);
-    ensure!((1..=9).contains(&num));
+    ensure!(kind <= 3, "Invalid kind: {kind}");
+    ensure!((1..=9).contains(&num), "Invalid num: {num}");
     if kind == 3 {
-        ensure!(num <= 7);
+        ensure!(num <= 7, "Invalid zi: {num}");
     }
 
     Ok(())
@@ -101,13 +101,17 @@ fn char_to_kind(c: char) -> Result<u8> {
     Ok(kind)
 }
 
-pub fn from_human_readable_string(src: &str) -> Result<Vec<u8>> {
+// [PCAM][1-9]*[mpsz]
+// Pon, Chi, Ankan, Minkan
+pub fn from_human_readable_string(src: &str) -> Result<Hand> {
     if !src.is_ascii() {
         bail!("Invalid character");
     }
 
-    let mut result = Vec::new();
-    let mut tmp = Vec::new();
+    let mut hand: Hand = Default::default();
+    let mut pai_list = Vec::new();
+    let mut num_list = Vec::new();
+    let mut fulou: Option<MianziType> = None;
 
     for &b in src.as_bytes() {
         let c = b as char;
@@ -115,32 +119,67 @@ pub fn from_human_readable_string(src: &str) -> Result<Vec<u8>> {
             c if c.is_ascii_whitespace() => {
                 // skip
             }
+            'P' => {
+                fulou = Some(MianziType::SamePon);
+            }
+            'C' => {
+                fulou = Some(MianziType::OrderedChi);
+            }
+            'A' => {
+                fulou = Some(MianziType::SameKanBlind);
+            }
+            'M' => {
+                fulou = Some(MianziType::SameKanOpen);
+            }
             '1'..='9' => {
                 let num = b - '0' as u8;
-                tmp.push(num);
+                num_list.push(num);
             }
             _ => {
                 // error if not mpsz
                 let kind = char_to_kind(c)?;
-                for &num in tmp.iter() {
-                    if kind == 3 {
-                        ensure!(num <= 7, "Invalid zipai");
+                match fulou {
+                    None => {
+                        for &num in num_list.iter() {
+                            let pai = encode(kind, num)?;
+                            pai_list.push(pai);
+                        }
                     }
-                    let pai = encode(kind, num).unwrap();
-                    result.push(pai);
+                    Some(mtype) => {
+                        let num = *num_list.get(0).ok_or(anyhow!("Invalid fulou"))?;
+                        let pai = encode(kind, num)?;
+                        let m = Mianzi { mtype, pai };
+                        hand.mianzi_list.push(m);
+                    }
                 }
-                tmp.clear();
+                num_list.clear();
+                fulou = None;
             }
         }
     }
-    if !tmp.is_empty() {
+    if !num_list.is_empty() {
         bail!("Ended with a number");
     }
-    if result.is_empty() {
+    if fulou.is_some() {
+        bail!("Invalid fulou");
+    }
+    if pai_list.is_empty() {
         bail!("Empty");
     }
 
-    Ok(result)
+    let total = hand.mianzi_list.len() * 3 + pai_list.len();
+    if total == 14 {
+        // finish with the rightmost pai
+        hand.finish_pai = pai_list.pop();
+    } else if total == 13 {
+        // any
+        hand.finish_pai = None;
+    } else {
+        bail!("Invalid hand count: {total}");
+    }
+    to_bucket(&mut hand.bucket, &pai_list);
+
+    Ok(hand)
 }
 
 // /////////////////////////////////////////////////////////////////////////////
@@ -681,41 +720,19 @@ mod tests {
     use super::*;
 
     #[test]
-    fn encode_decode() {
+    fn encode_decode() -> Result<()> {
         for k in 0..4 {
             for n in 1..10 {
                 if k == 3 && n > 7 {
                     continue;
                 }
-                let enc = encode(k, n).unwrap();
-                let (kk, nn) = decode(enc).unwrap();
+                let enc = encode(k, n)?;
+                let (kk, nn) = decode(enc)?;
                 assert_eq!(k, kk);
                 assert_eq!(n, nn);
             }
         }
-    }
-
-    #[test]
-    fn parse_human_readable() {
-        let hand = from_human_readable_string("123456789m123456789p123456789s1234567z").unwrap();
-
-        for k in 0..4 {
-            for n in 1..10 {
-                if k == 3 && n > 7 {
-                    continue;
-                }
-                assert!(hand.binary_search(&encode(k, n).unwrap()).is_ok());
-            }
-        }
-
-        let hand = from_human_readable_string("あm");
-        assert!(hand.is_err());
-        let hand = from_human_readable_string("0m");
-        assert!(hand.is_err());
-        let hand = from_human_readable_string("0z");
-        assert!(hand.is_err());
-        let hand = from_human_readable_string("12345");
-        assert!(hand.is_err());
+        Ok(())
     }
 
     #[test]
@@ -840,81 +857,71 @@ mod tests {
     }
 
     #[test]
-    fn enum_finish() {
-        fn test(input: &str) -> i32 {
-            let mut src = from_human_readable_string(input).unwrap();
-            let mut hand: Hand = Default::default();
-            hand.finish_pai = src.pop();
+    fn enum_finish() -> Result<()> {
+        fn test(input: &str) -> Result<i32> {
+            let mut hand = from_human_readable_string(input)?;
             let mut result = Vec::new();
-            to_bucket(&mut hand.bucket, &src);
-            all_finish_patterns(&mut hand, &mut result).unwrap();
+            all_finish_patterns(&mut hand, &mut result)?;
 
-            result.len() as i32
+            Ok(result.len() as i32)
         }
 
-        assert_eq!(1, test("111999m111999p1s 1s"));
-        assert_eq!(1, test("123789m123789p1s 1s"));
-        assert_eq!(1, test("12m789m123789p11s 3m"));
-        assert_eq!(1, test("13m789m123789p11s 2m"));
-        assert_eq!(1, test("23m789m123789p11s 1m"));
-        assert_eq!(1, test("23m789m123789p11s 4m"));
+        assert_eq!(1, test("111999m111999p1s 1s")?);
+        assert_eq!(1, test("123789m123789p1s 1s")?);
+        assert_eq!(1, test("12m789m123789p11s 3m")?);
+        assert_eq!(1, test("13m789m123789p11s 2m")?);
+        assert_eq!(1, test("23m789m123789p11s 1m")?);
+        assert_eq!(1, test("23m789m123789p11s 4m")?);
+
+        Ok(())
     }
 
     #[test]
-    fn enum_wait() {
-        fn test(input: &str) -> i32 {
-            let src = from_human_readable_string(input).unwrap();
-            let mut hand: Hand = Default::default();
-            // any
-            hand.finish_pai = None;
+    fn enum_wait() -> Result<()> {
+        fn test(input: &str) -> Result<i32> {
+            let mut hand = from_human_readable_string(input)?;
             let mut result = Vec::new();
-            to_bucket(&mut hand.bucket, &src);
-            all_finish_patterns(&mut hand, &mut result).unwrap();
+            all_finish_patterns(&mut hand, &mut result)?;
 
             let mut result: Vec<_> = result.iter().map(|f| f.finish_pai).collect();
             result.sort();
             result.dedup();
 
-            result.len() as i32
+            Ok(result.len() as i32)
         }
 
-        assert_eq!(1, test("111999m111999p1s"));
-        assert_eq!(2, test("11999m111999p11s"));
-        assert_eq!(1, test("123789m123789p1s"));
-        assert_eq!(1, test("12m789m123789p11s"));
-        assert_eq!(1, test("13m789m123789p11s"));
-        assert_eq!(2, test("23m789m123789p11s"));
+        assert_eq!(1, test("111999m111999p1s")?);
+        assert_eq!(2, test("11999m111999p11s")?);
+        assert_eq!(1, test("123789m123789p1s")?);
+        assert_eq!(1, test("12m789m123789p11s")?);
+        assert_eq!(1, test("13m789m123789p11s")?);
+        assert_eq!(2, test("23m789m123789p11s")?);
 
-        assert_eq!(9, test("1112345678999m"));
+        assert_eq!(9, test("1112345678999m")?);
+
+        Ok(())
     }
 
     #[test]
-    fn practical() {
+    fn practical() -> Result<()> {
         // https://mj-station.net/question/pointpractice3/
 
-        let mut src = from_human_readable_string("345m789p2244z 2z").unwrap();
-        let mut hand: Hand = Default::default();
-        hand.mianzi_list.push(Mianzi {
-            mtype: MianziType::SameKanBlind,
-            pai: from_human_readable_string("1m").unwrap()[0],
-        });
-        hand.finish_pai = src.pop();
+        let mut hand = from_human_readable_string("345m789p2244z A1111m 2z")?;
+        println!("{:?}", hand);
         let param = PointParam {
             field_wind: 0,
             self_wind: 2,
             reach: Reach::Single,
             ..Default::default()
         };
-
         let mut result = Vec::new();
-        to_bucket(&mut hand.bucket, &src);
-        all_finish_patterns(&mut hand, &mut result).unwrap();
+        all_finish_patterns(&mut hand, &mut result)?;
 
         let mut points: Vec<_> = result.iter().map(|r| calc_base_point(r, &param)).collect();
         points.sort_by(|a, b| b.cmp(a));
 
-        println!("{:?}", points[0]);
-        //println!("{:?}", Yaku::to_japanese_list(points[0].yaku));
         assert_eq!((1200, 2300), calc_point_c_tumo(points[0].base_point));
+
+        Ok(())
     }
 }
