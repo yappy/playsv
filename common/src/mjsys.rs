@@ -99,7 +99,7 @@ fn char_to_kind(c: char) -> Result<u8> {
     Ok(kind)
 }
 
-pub fn from_human_readable_string(src: &str) -> Result<(Vec<u8>, u8)> {
+pub fn from_human_readable_string(src: &str) -> Result<Vec<u8>> {
     if !src.is_ascii() {
         bail!("Invalid character");
     }
@@ -137,10 +137,9 @@ pub fn from_human_readable_string(src: &str) -> Result<(Vec<u8>, u8)> {
     if result.is_empty() {
         bail!("Empty");
     }
-    let last = result.pop().unwrap();
     result.sort();
 
-    Ok((result, last))
+    Ok(result)
 }
 
 // /////////////////////////////////////////////////////////////////////////////
@@ -225,7 +224,8 @@ pub struct Hand {
     bucket: [u8; PAI_COUNT],
     mianzi_list: Vec<Mianzi>,
     head: Option<u8>,
-    finish_pai: u8,
+    // search all if None
+    finish_pai: Option<u8>,
     tumo: bool,
 }
 
@@ -235,7 +235,7 @@ impl Default for Hand {
             bucket: [0; PAI_COUNT],
             mianzi_list: Default::default(),
             head: None,
-            finish_pai: 0,
+            finish_pai: None,
             tumo: true,
         }
     }
@@ -317,7 +317,10 @@ pub fn all_finish_patterns(hand: &mut Hand, result: &mut Vec<FinishHand>) -> Res
 }
 
 fn check_finish(pai1: u8, pai2: u8, finish_pai: u8, hand: &Hand) -> Option<FinishHand> {
-    if pai1 == pai2 && pai2 == finish_pai {
+    assert!(pai1 <= pai2);
+
+    // triple finish
+    if pai1 == pai2 && pai1 == finish_pai {
         let mut mianzi_list = hand.mianzi_list.clone();
         let mtype = if hand.tumo {
             MianziType::Same
@@ -325,10 +328,7 @@ fn check_finish(pai1: u8, pai2: u8, finish_pai: u8, hand: &Hand) -> Option<Finis
             // if Ron, can keep menzen but treat fu/fan as Pon
             MianziType::SameRon
         };
-        mianzi_list.push(Mianzi {
-            mtype,
-            pai: finish_pai,
-        });
+        mianzi_list.push(Mianzi { mtype, pai: pai1 });
         return Some(FinishHand {
             finish_type: FinishType::Shabo,
             mianzi_list,
@@ -338,10 +338,12 @@ fn check_finish(pai1: u8, pai2: u8, finish_pai: u8, hand: &Hand) -> Option<Finis
         });
     }
 
+    // order finish
     let (k1, n1) = decode(pai1).unwrap();
-    let (k2, n2) = decode(pai1).unwrap();
-    let (kf, nf) = decode(pai1).unwrap();
-    if k1 >= 3 {
+    let (k2, n2) = decode(pai2).unwrap();
+    let (kf, nf) = decode(finish_pai).unwrap();
+    // (not ji) and (color is the same)
+    if is_ji(pai1).unwrap() {
         return None;
     }
     if k1 != k2 || k2 != kf {
@@ -373,7 +375,7 @@ fn check_finish(pai1: u8, pai2: u8, finish_pai: u8, hand: &Hand) -> Option<Finis
             finish_pai,
             tumo: hand.tumo,
         })
-    } else if (nf + 1 == n1 && n1 + 1 == nf) || (n1 + 1 == n2 && n2 + 1 == nf) {
+    } else if (nf + 1 == n1 && n1 + 1 == n2) || (n1 + 1 == n2 && n2 + 1 == nf) {
         let mut mianzi_list = hand.mianzi_list.clone();
         mianzi_list.push(Mianzi {
             mtype: MianziType::Ordered,
@@ -410,7 +412,7 @@ fn finish_patterns(
         }
         return Ok(());
     }
-
+    // the last part
     if tanki {
         if hand.mianzi_list.len() == 4 {
             ensure!(hand.bucket.iter().sum::<u8>() == 1);
@@ -421,12 +423,13 @@ fn finish_patterns(
                 .find(|(_i, &x)| x > 0)
                 .unwrap();
             let pai = pai as u8;
-            if hand.finish_pai == pai {
+            // ok if finish=Any or finish=lastpai
+            if hand.finish_pai.is_none() || hand.finish_pai.unwrap() == pai {
                 result.push(FinishHand {
                     finish_type: FinishType::Tanki,
                     mianzi_list: hand.mianzi_list.clone(),
                     head: pai,
-                    finish_pai: hand.finish_pai,
+                    finish_pai: pai,
                     tumo: hand.tumo,
                 })
             }
@@ -434,27 +437,36 @@ fn finish_patterns(
     } else {
         if hand.mianzi_list.len() == 3 {
             ensure!(hand.bucket.iter().sum::<u8>() == 2);
-            let (pai, &count) = hand
+            let (pai1, &count) = hand
                 .bucket
                 .iter()
                 .enumerate()
                 .find(|(_i, &x)| x > 0)
                 .unwrap();
-            let pai1 = pai as u8;
+            let pai1 = pai1 as u8;
             let pai2 = if count >= 2 {
                 pai1
             } else {
-                let rest = &hand.bucket[pai..];
-                let (pai, &count) = rest.iter().enumerate().find(|(_i, &x)| x > 0).unwrap();
-                pai as u8
+                let rest = &hand.bucket[pai1 as usize + 1..];
+                let (pai2, _) = rest.iter().enumerate().find(|(i, &x)| x > 0).unwrap();
+                (pai1 + 1) + (pai2 as u8)
             };
-            let fin = check_finish(pai1, pai2, hand.finish_pai, hand);
-            if fin.is_some() {
-                result.push(fin.unwrap());
+            if let Some(finish_pai) = hand.finish_pai {
+                let fin = check_finish(pai1, pai2, finish_pai, hand);
+                if fin.is_some() {
+                    result.push(fin.unwrap());
+                }
+            } else {
+                for finish_pai in 0..(PAI_COUNT as u8) {
+                    let fin = check_finish(pai1, pai2, finish_pai, hand);
+                    if fin.is_some() {
+                        result.push(fin.unwrap());
+                    }
+                }
             }
         }
     }
-
+    // try choices
     for pai in start..PAI_COUNT {
         if hand.bucket[pai] == 0 {
             continue;
@@ -583,8 +595,7 @@ mod tests {
 
     #[test]
     fn parse_human_readable() {
-        let (hand, last) =
-            from_human_readable_string("123456789m123456789p123456789s1234567z1m").unwrap();
+        let hand = from_human_readable_string("123456789m123456789p123456789s1234567z").unwrap();
 
         for k in 0..4 {
             for n in 1..10 {
@@ -594,7 +605,6 @@ mod tests {
                 assert!(hand.binary_search(&encode(k, n).unwrap()).is_ok());
             }
         }
-        assert_eq!(last, encode(0, 1).unwrap());
 
         let hand = from_human_readable_string("あm");
         assert!(hand.is_err());
@@ -607,21 +617,51 @@ mod tests {
     }
 
     #[test]
-    fn enum_hand() {
-        let (src, fin) = from_human_readable_string("111999m111999p1s 1s").unwrap();
-        let mut hand: Hand = Default::default();
-        hand.finish_pai = fin as u8;
-        let mut result = Vec::new();
-        to_bucket(&mut hand.bucket, &src);
-        all_finish_patterns(&mut hand, &mut result).unwrap();
-        assert_eq!(result.len(), 1);
+    fn enum_finish() {
+        fn test(input: &str) -> i32 {
+            let mut src = from_human_readable_string(input).unwrap();
+            let mut hand: Hand = Default::default();
+            hand.finish_pai = src.pop();
+            let mut result = Vec::new();
+            to_bucket(&mut hand.bucket, &src);
+            all_finish_patterns(&mut hand, &mut result).unwrap();
 
-        let (src, fin) = from_human_readable_string("123789m123789p1s 1s").unwrap();
-        let mut hand: Hand = Default::default();
-        hand.finish_pai = fin as u8;
-        let mut result = Vec::new();
-        to_bucket(&mut hand.bucket, &src);
-        all_finish_patterns(&mut hand, &mut result).unwrap();
-        assert_eq!(result.len(), 1);
+            result.len() as i32
+        }
+
+        assert_eq!(1, test("111999m111999p1s 1s"));
+        assert_eq!(1, test("123789m123789p1s 1s"));
+        assert_eq!(1, test("12m789m123789p11s 3m"));
+        assert_eq!(1, test("13m789m123789p11s 2m"));
+        assert_eq!(1, test("23m789m123789p11s 1m"));
+        assert_eq!(1, test("23m789m123789p11s 4m"));
+    }
+
+    #[test]
+    fn enum_wait() {
+        fn test(input: &str) -> i32 {
+            let src = from_human_readable_string(input).unwrap();
+            let mut hand: Hand = Default::default();
+            // any
+            hand.finish_pai = None;
+            let mut result = Vec::new();
+            to_bucket(&mut hand.bucket, &src);
+            all_finish_patterns(&mut hand, &mut result).unwrap();
+
+            let mut result:Vec<_> = result.iter().map(|f|f.finish_pai).collect();
+            result.sort();
+            result.dedup();
+
+            result.len() as i32
+        }
+
+        assert_eq!(1, test("111999m111999p1s"));
+        assert_eq!(2, test("11999m111999p11s"));
+        assert_eq!(1, test("123789m123789p1s"));
+        assert_eq!(1, test("12m789m123789p11s"));
+        assert_eq!(1, test("13m789m123789p11s"));
+        assert_eq!(2, test("23m789m123789p11s"));
+
+        assert_eq!(9, test("1112345678999m"));
     }
 }
