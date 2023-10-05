@@ -226,11 +226,11 @@ pub fn check_yaku(hand: &FinishHand, param: &PointParam, menzen: bool) -> u64 {
         let f_yes = hand
             .mianzi_list
             .iter()
-            .any(|m| m.mtype.is_same() && m.pai as u8 == param.field_wind);
+            .any(|m| m.mtype.is_same() && m.pai == param.field_wind_pi());
         let s_yes = hand
             .mianzi_list
             .iter()
-            .any(|m| m.mtype.is_same() && m.pai as u8 == param.self_wind);
+            .any(|m| m.mtype.is_same() && m.pai == param.self_wind_pi());
         if f_yes {
             yaku |= match param.field_wind {
                 0 => Yaku::FIELD_E,

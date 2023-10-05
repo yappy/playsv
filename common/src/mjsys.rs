@@ -22,7 +22,7 @@ pub const PAI_COUNT: usize = 34;
 pub const OFFSET_M: u8 = 0;
 pub const OFFSET_P: u8 = 9;
 pub const OFFSET_S: u8 = 18;
-pub const OFFSET_J: u8 = 27;
+pub const OFFSET_Z: u8 = 27;
 
 fn validate(kind: u8, num: u8) -> Result<()> {
     ensure!(kind <= 3);
@@ -139,7 +139,6 @@ pub fn from_human_readable_string(src: &str) -> Result<Vec<u8>> {
     if result.is_empty() {
         bail!("Empty");
     }
-    result.sort();
 
     Ok(result)
 }
@@ -303,13 +302,15 @@ pub struct Point {
     yaku: u64,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub enum Reach {
+    #[default]
     None,
     Single,
     Double,
 }
 
+#[derive(Debug, Clone, Default)]
 // ref. https://blog.kobalab.net/entry/20151221/1450624780
 pub struct PointParam {
     // 0, 1, 2, 3
@@ -325,6 +326,20 @@ pub struct PointParam {
     tenchi: bool,
     dora: Vec<u8>,
     ura: Vec<u8>,
+}
+
+impl PointParam {
+    pub fn field_wind_pi(&self) -> u8 {
+        assert!(self.field_wind < 4);
+
+        OFFSET_Z + self.field_wind
+    }
+
+    pub fn self_wind_pi(&self) -> u8 {
+        assert!(self.self_wind < 4);
+
+        OFFSET_Z + self.self_wind
+    }
 }
 
 pub fn to_bucket(dst: &mut [u8; PAI_COUNT], src: &[u8]) {
@@ -561,11 +576,11 @@ fn calc_fu(hand: &FinishHand, param: &PointParam, menzen: bool) -> u32 {
     {
         let mut tmp = 0;
         let head = hand.head;
-        if is_sangen(head).unwrap() || hand.head == param.self_wind {
+        if is_sangen(head).unwrap() || hand.head == param.self_wind_pi() {
             tmp += 2;
         }
         // NOTICE: by rule option
-        if hand.head == param.field_wind {
+        if hand.head == param.field_wind_pi() {
             tmp += 2;
         }
         fu += tmp;
@@ -586,7 +601,8 @@ fn calc_fu(hand: &FinishHand, param: &PointParam, menzen: bool) -> u32 {
         fu = 30;
     }
 
-    fu
+    // roundup 10
+    (fu + 9) / 10 * 10
 }
 
 pub fn calc_base_point(hand: &FinishHand, param: &PointParam) -> Point {
@@ -626,23 +642,39 @@ pub fn calc_base_point_direct(fan: u32, fu: u32, yaku: u64) -> Point {
     }
 }
 
+fn roundup100(x: u32) -> u32 {
+    (x + 99) / 100 * 100
+}
+
 // x1, x2, x4, x6
-// Child : {0}, {1} or Ron {2}
-// Parent: {1} all or Ron {3}
-pub fn calc_point(base_point: u32) -> (u32, u32, u32, u32) {
+// Child : {1}, {2} or Ron {4}
+// Parent: {2} all or Ron {6}
+
+pub fn calc_point_p_tumo(base_point: u32) -> u32 {
     assert!(base_point <= 2000);
 
-    fn roundup100(x: u32) -> u32 {
-        (x + 99) / 100 * 100
-    }
-
-    (
-        roundup100(base_point),
-        roundup100(base_point * 2),
-        roundup100(base_point * 4),
-        roundup100(base_point * 6),
-    )
+    roundup100(base_point * 2)
 }
+
+pub fn calc_point_p_ron(base_point: u32) -> u32 {
+    assert!(base_point <= 2000);
+
+    roundup100(base_point * 6)
+}
+
+pub fn calc_point_c_tumo(base_point: u32) -> (u32, u32) {
+    assert!(base_point <= 2000);
+
+    (roundup100(base_point * 1), roundup100(base_point * 2))
+}
+
+pub fn calc_point_c_ron(base_point: u32) -> u32 {
+    assert!(base_point <= 2000);
+
+    roundup100(base_point * 4)
+}
+
+// -----------------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests {
@@ -790,19 +822,18 @@ mod tests {
         for (i1, &fan) in fan_list.iter().enumerate() {
             for (i2, &fu) in fu_list.iter().enumerate() {
                 let base = calc_base_point_direct(fan, fu, 0).base_point;
-                let p = calc_point(base);
 
                 if p_ron[i1][i2] != 0 {
-                    assert_eq!(p_ron[i1][i2], p.3);
+                    assert_eq!(p_ron[i1][i2], calc_point_p_ron(base));
                 }
                 if p_tumo[i1][i2] != 0 {
-                    assert_eq!(p_tumo[i1][i2], p.1);
+                    assert_eq!(p_tumo[i1][i2], calc_point_p_tumo(base));
                 }
                 if c_ron[i1][i2] != 0 {
-                    assert_eq!(c_ron[i1][i2], p.2);
+                    assert_eq!(c_ron[i1][i2], calc_point_c_ron(base));
                 }
                 if c_tumo[i1][i2] != (0, 0) {
-                    assert_eq!(c_tumo[i1][i2], (p.0, p.1));
+                    assert_eq!(c_tumo[i1][i2], calc_point_c_tumo(base));
                 }
             }
         }
@@ -855,5 +886,35 @@ mod tests {
         assert_eq!(2, test("23m789m123789p11s"));
 
         assert_eq!(9, test("1112345678999m"));
+    }
+
+    #[test]
+    fn practical() {
+        // https://mj-station.net/question/pointpractice3/
+
+        let mut src = from_human_readable_string("345m789p2244z 2z").unwrap();
+        let mut hand: Hand = Default::default();
+        hand.mianzi_list.push(Mianzi {
+            mtype: MianziType::SameKanBlind,
+            pai: from_human_readable_string("1m").unwrap()[0],
+        });
+        hand.finish_pai = src.pop();
+        let param = PointParam {
+            field_wind: 0,
+            self_wind: 2,
+            reach: Reach::Single,
+            ..Default::default()
+        };
+
+        let mut result = Vec::new();
+        to_bucket(&mut hand.bucket, &src);
+        all_finish_patterns(&mut hand, &mut result).unwrap();
+
+        let mut points: Vec<_> = result.iter().map(|r| calc_base_point(r, &param)).collect();
+        points.sort_by(|a, b| b.cmp(a));
+
+        println!("{:?}", points[0]);
+        //println!("{:?}", Yaku::to_japanese_list(points[0].yaku));
+        assert_eq!((1200, 2300), calc_point_c_tumo(points[0].base_point));
     }
 }
