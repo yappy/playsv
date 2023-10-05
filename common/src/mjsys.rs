@@ -16,6 +16,8 @@ mod yaku;
 
 use anyhow::{bail, ensure, Result};
 
+use yaku::Yaku;
+
 pub const PAI_COUNT: usize = 34;
 pub const OFFSET_M: u8 = 0;
 pub const OFFSET_P: u8 = 9;
@@ -32,7 +34,7 @@ fn validate(kind: u8, num: u8) -> Result<()> {
     Ok(())
 }
 
-// returns (kind, number, opt)
+// returns (kind, number)
 pub fn decode(code: u8) -> Result<(u8, u8)> {
     let kind = code / 9;
     let num = code % 9 + 1;
@@ -270,15 +272,38 @@ pub struct FinishHand {
     tumo: bool,
 }
 
-pub struct Point {
-    // YAKU*
-    yaku: u64,
-    fu: u32,
-    fan: u32,
-    point: u32,
+impl FinishHand {
+    pub fn to_pai_list(&self) -> Vec<u8> {
+        let mut result = Vec::new();
+        result.push(self.head);
+        result.push(self.head);
+        for m in self.mianzi_list.iter() {
+            if m.mtype.is_ordered() {
+                result.push(m.pai);
+                result.push(m.pai + 1);
+                result.push(m.pai + 2);
+            } else {
+                result.push(m.pai);
+                result.push(m.pai);
+                result.push(m.pai);
+            }
+        }
+
+        result
+    }
 }
 
-#[derive(PartialEq)]
+// The order means priorities for sort keys
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Point {
+    raw_point: u32,
+    fan: u32,
+    fu: u32,
+    // YAKU*
+    yaku: u64,
+}
+
+#[derive(Debug, PartialEq)]
 pub enum Reach {
     None,
     Single,
@@ -527,21 +552,23 @@ fn calc_fu(hand: &FinishHand, param: &PointParam, menzen: bool) -> u32 {
         }
         fu += tmp;
     }
-    {
-        //wait
-    }
-
+    // wait
+    fu += match hand.finish_type {
+        FinishType::Ryanmen | FinishType::Shabo => 0,
+        FinishType::Penchan | FinishType::Kanchan | FinishType::Tanki => 2,
+    };
+    // head
     {
         let mut tmp = 0;
         let head = hand.head;
         if is_sangen(head).unwrap() || hand.head == param.self_wind {
             tmp += 2;
         }
-        // TODO: by rule option
+        // NOTICE: by rule option
         if hand.head == param.field_wind {
             tmp += 2;
         }
-        fu += 2;
+        fu += tmp;
     }
 
     if hand.tumo {
@@ -557,7 +584,7 @@ fn calc_fu(hand: &FinishHand, param: &PointParam, menzen: bool) -> u32 {
     fu
 }
 
-pub fn calc_point(hand: &FinishHand, param: &PointParam) -> Point {
+pub fn calc_raw_point(hand: &FinishHand, param: &PointParam) -> Point {
     let menzen = hand.mianzi_list.iter().all(|m| m.mtype.is_menzen());
 
     let mut yaku = yaku::check_yaku(hand, param, menzen);
@@ -566,12 +593,39 @@ pub fn calc_point(hand: &FinishHand, param: &PointParam) -> Point {
         yaku |= yaku::Yaku::PINHU.0;
     }
 
-    Point {
-        yaku,
-        fu,
-        fan: 0,
-        point: 0,
+    let fan1 = Yaku::fan_sum(yaku);
+    let mut fan2 = 0;
+    for pai in hand.to_pai_list() {
+        for &dora in param.dora.iter() {
+            if pai == dora {
+                fan2 += 1;
+            }
+        }
     }
+    let fan = fan1 + fan2;
+
+    calc_raw_point_direct(fan, fu, yaku)
+}
+
+pub fn calc_raw_point_direct(fan: u32, fu: u32, yaku: u64) -> Point {
+    let raw_point = fu << (fan + 2);
+
+    Point {
+        raw_point,
+        fan,
+        fu,
+        yaku,
+    }
+}
+
+// Child : {0}, {1}
+// Parent: {1} all
+pub fn calc_point(raw_point: u32) -> (u32, u32) {
+    fn roundup100(x: u32) -> u32 {
+        (x + 99) / 100
+    }
+
+    (roundup100(raw_point), roundup100(raw_point * 2))
 }
 
 #[cfg(test)]
@@ -648,7 +702,7 @@ mod tests {
             to_bucket(&mut hand.bucket, &src);
             all_finish_patterns(&mut hand, &mut result).unwrap();
 
-            let mut result:Vec<_> = result.iter().map(|f|f.finish_pai).collect();
+            let mut result: Vec<_> = result.iter().map(|f| f.finish_pai).collect();
             result.sort();
             result.dedup();
 
