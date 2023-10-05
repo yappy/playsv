@@ -296,7 +296,7 @@ impl FinishHand {
 // The order means priorities for sort keys
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Point {
-    raw_point: u32,
+    base_point: u32,
     fan: u32,
     fu: u32,
     // YAKU*
@@ -584,7 +584,7 @@ fn calc_fu(hand: &FinishHand, param: &PointParam, menzen: bool) -> u32 {
     fu
 }
 
-pub fn calc_raw_point(hand: &FinishHand, param: &PointParam) -> Point {
+pub fn calc_base_point(hand: &FinishHand, param: &PointParam) -> Point {
     let menzen = hand.mianzi_list.iter().all(|m| m.mtype.is_menzen());
 
     let mut yaku = yaku::check_yaku(hand, param, menzen);
@@ -604,28 +604,39 @@ pub fn calc_raw_point(hand: &FinishHand, param: &PointParam) -> Point {
     }
     let fan = fan1 + fan2;
 
-    calc_raw_point_direct(fan, fu, yaku)
+    calc_base_point_direct(fan, fu, yaku)
 }
 
-pub fn calc_raw_point_direct(fan: u32, fu: u32, yaku: u64) -> Point {
-    let raw_point = fu << (fan + 2);
+pub fn calc_base_point_direct(fan: u32, fu: u32, yaku: u64) -> Point {
+    // NOTICE: 7700 or 8000 rule
+    // mangan limit
+    let base_point = if fan < 5 { fu << (fan + 2) } else { 2000 };
+    let base_point = base_point.min(2000);
 
     Point {
-        raw_point,
+        base_point,
         fan,
         fu,
         yaku,
     }
 }
 
-// Child : {0}, {1}
-// Parent: {1} all
-pub fn calc_point(raw_point: u32) -> (u32, u32) {
+// x1, x2, x4, x6
+// Child : {0}, {1} or Ron {2}
+// Parent: {1} all or Ron {3}
+pub fn calc_point(base_point: u32) -> (u32, u32, u32, u32) {
+    assert!(base_point <= 2000);
+
     fn roundup100(x: u32) -> u32 {
-        (x + 99) / 100
+        (x + 99) / 100 * 100
     }
 
-    (roundup100(raw_point), roundup100(raw_point * 2))
+    (
+        roundup100(base_point),
+        roundup100(base_point * 2),
+        roundup100(base_point * 4),
+        roundup100(base_point * 6),
+    )
 }
 
 #[cfg(test)]
@@ -668,6 +679,128 @@ mod tests {
         assert!(hand.is_err());
         let hand = from_human_readable_string("12345");
         assert!(hand.is_err());
+    }
+
+    #[test]
+    fn point_table() {
+        let fan_list: [u32; 4] = [1, 2, 3, 4];
+        let fu_list: [u32; 11] = [20, 25, 30, 40, 50, 60, 70, 80, 90, 100, 110];
+        let p_ron: [[u32; 11]; 4] = [
+            [
+                0___, 0___, 1500, 2000, 2400, 2900, 3400, 3900, 4400, 4800, 5300,
+            ],
+            [
+                0___, 2400, 2900, 3900, 4800, 5800, 6800, 7700, 8700, 9600, 10600,
+            ],
+            [
+                0___, 4800, 5800, 7700, 9600, 11600, 12000, 12000, 12000, 12000, 12000,
+            ],
+            [
+                0___, 9600, 11600, 12000, 12000, 12000, 12000, 12000, 12000, 12000, 12000,
+            ],
+        ];
+        let p_tumo: [[u32; 11]; 4] = [
+            [
+                0___, 0___, 500_, 700_, 800_, 1000, 1200, 1300, 1500, 1600, 1800,
+            ],
+            [
+                700_, 800_, 1000, 1300, 1600, 2000, 2300, 2600, 2900, 3200, 3600,
+            ],
+            [
+                1300, 1600, 2000, 2600, 3200, 3900, 4000, 4000, 4000, 4000, 4000,
+            ],
+            [
+                2600, 3200, 3900, 4000, 4000, 4000, 4000, 4000, 4000, 4000, 4000,
+            ],
+        ];
+        let c_ron: [[u32; 11]; 4] = [
+            [
+                0___, 0___, 1000, 1300, 1600, 2000, 2300, 2600, 2900, 3200, 3600,
+            ],
+            [
+                0___, 1600, 2000, 2600, 3200, 3900, 4500, 5200, 5800, 6400, 7100,
+            ],
+            [
+                0___, 3200, 3900, 5200, 6400, 7700, 8000, 8000, 8000, 8000, 8000,
+            ],
+            [
+                0___, 6400, 7700, 8000, 8000, 8000, 8000, 8000, 8000, 8000, 8000,
+            ],
+        ];
+        let c_tumo: [[(u32, u32); 11]; 4] = [
+            [
+                (0, 0),
+                (0, 0),
+                (300, 500),
+                (400, 700),
+                (400, 800),
+                (500, 1000),
+                (600, 1200),
+                (700, 1300),
+                (800, 1500),
+                (800, 1600),
+                (900, 1800),
+            ],
+            [
+                (400_, 700),
+                (400_, 800),
+                (500_, 1000),
+                (700_, 1300),
+                (800_, 1600),
+                (1000, 2000),
+                (1200, 2300),
+                (1300, 2600),
+                (1500, 2900),
+                (1600, 3200),
+                (1800, 3600),
+            ],
+            [
+                (700_, 1300),
+                (800_, 1600),
+                (1000, 2000),
+                (1300, 2600),
+                (1600, 3200),
+                (2000, 3900),
+                (2000, 4000),
+                (2000, 4000),
+                (2000, 4000),
+                (2000, 4000),
+                (2000, 4000),
+            ],
+            [
+                (1300, 2600),
+                (1600, 3200),
+                (2000, 3900),
+                (2000, 4000),
+                (2000, 4000),
+                (2000, 4000),
+                (2000, 4000),
+                (2000, 4000),
+                (2000, 4000),
+                (2000, 4000),
+                (2000, 4000),
+            ],
+        ];
+
+        for (i1, &fan) in fan_list.iter().enumerate() {
+            for (i2, &fu) in fu_list.iter().enumerate() {
+                let base = calc_base_point_direct(fan, fu, 0).base_point;
+                let p = calc_point(base);
+
+                if p_ron[i1][i2] != 0 {
+                    assert_eq!(p_ron[i1][i2], p.3);
+                }
+                if p_tumo[i1][i2] != 0 {
+                    assert_eq!(p_tumo[i1][i2], p.1);
+                }
+                if c_ron[i1][i2] != 0 {
+                    assert_eq!(c_ron[i1][i2], p.2);
+                }
+                if c_tumo[i1][i2] != (0, 0) {
+                    assert_eq!(c_tumo[i1][i2], (p.0, p.1));
+                }
+            }
+        }
     }
 
     #[test]
