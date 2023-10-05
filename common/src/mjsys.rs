@@ -577,6 +577,11 @@ fn calc_fu(hand: &FinishHand, param: &PointParam, menzen: bool) -> u32 {
         fu += 10;
     }
 
+    // pinhu
+    if fu == 22 {
+        fu = 20;
+    }
+    // naki-pinhu
     if !menzen && fu == 20 {
         fu = 30;
     }
