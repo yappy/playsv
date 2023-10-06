@@ -2,7 +2,7 @@ use crate::mjgame;
 use actix_cors::Cors;
 use actix_web::{get, http, post, web, App, HttpResponse, HttpServer, Responder};
 use anyhow::Result;
-use common::jsif;
+use game::jsif;
 use git_version::git_version;
 use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicU64, Ordering};

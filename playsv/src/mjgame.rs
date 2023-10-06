@@ -1,5 +1,5 @@
 use anyhow::{ensure, Result};
-use common::{jsif, mjsys};
+use game::{jsif, mjsys};
 use rand::seq::SliceRandom;
 use std::sync::RwLock;
 
