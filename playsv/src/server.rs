@@ -146,24 +146,31 @@ async fn get_room_id_player(
     }
 }
 
-pub async fn server_main() -> Result<()> {
+pub async fn server_main(port: u16, cors_enable: bool) -> Result<()> {
     // create shared state object (Arc internally)
     let app_state = web::Data::new(AppState {
         next_id: AtomicU64::new(0),
         rooms: Default::default(),
     });
 
-    println!("http://127.0.0.1:8888{PUBLIC_URL}/");
+    println!("http://127.0.0.1:{port}{PUBLIC_URL}/");
+    println!("CORS: {}", if cors_enable { "Enabled" } else { "Disabled" });
+
     // pass a function as App builder
     // move app_state into closure
     HttpServer::new(move || {
-        let cors = Cors::default()
-            .allowed_origin("http://127.0.0.1:8080")
-            .allowed_methods(vec!["GET", "POST"])
-            .allowed_headers(vec![http::header::AUTHORIZATION, http::header::ACCEPT])
-            .allowed_header(http::header::CONTENT_TYPE)
-            .supports_credentials()
-            .max_age(3600);
+        // for `trunk serve`
+        let cors = if cors_enable {
+            Cors::default()
+                .allowed_origin("http://127.0.0.1:8080")
+                .allowed_methods(vec!["GET", "POST"])
+                .allowed_headers(vec![http::header::AUTHORIZATION, http::header::ACCEPT])
+                .allowed_header(http::header::CONTENT_TYPE)
+                .supports_credentials()
+                .max_age(3600)
+        } else {
+            Cors::default()
+        };
 
         App::new().wrap(cors).app_data(app_state.clone()).service(
             web::scope(PUBLIC_URL)
@@ -175,7 +182,7 @@ pub async fn server_main() -> Result<()> {
                 .service(get_room_id_player),
         )
     })
-    .bind("127.0.0.1:8888")?
+    .bind(format!("127.0.0.1:{port}"))?
     .run()
     .await?;
 
