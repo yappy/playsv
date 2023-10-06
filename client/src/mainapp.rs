@@ -9,7 +9,7 @@ use getopts::{Matches, Options};
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 use web_sys::{CanvasRenderingContext2d, HtmlImageElement};
 
-const SERVER: &str = "127.0.0.1:8888";
+const APIROOT: &str = env!("TRUNK_BUILD_PUBLIC_URL");
 
 const CANVAS_W: u32 = 640;
 const CANVAS_H: u32 = 480;
@@ -92,7 +92,7 @@ impl MainApp {
 
 impl App for MainApp {
     fn init(&mut self) {
-        let url = format!("http://{SERVER}/api/info");
+        let url = format!("{APIROOT}api/info");
         let dest = Rc::clone(&self.server_info);
         self.http.get(&url, move |result| {
             let info: jsif::ServerInfo = serde_json::from_str(result.expect("HTTP request error"))
@@ -100,7 +100,7 @@ impl App for MainApp {
             *dest.borrow_mut() = Some(format!("{}\n{}", info.version, info.description));
         });
 
-        let url = format!("http://{SERVER}/api/room");
+        let url = format!("{APIROOT}api/room");
         let dest = Rc::clone(&self.state);
         self.http.get(&url, move |result| {
             let rooms: jsif::RoomList = serde_json::from_str(result.expect("HTTP request error"))
@@ -370,7 +370,7 @@ impl MainApp {
         }
 
         if let Some(comment) = args.opt_str("c") {
-            let url = format!("http://{SERVER}/api/room");
+            let url = format!("{APIROOT}api/room");
             let param = jsif::CreateRoom {
                 comment: comment.clone(),
             };
@@ -383,7 +383,7 @@ impl MainApp {
                 }
             });
         } else {
-            let url = format!("http://{SERVER}/api/room");
+            let url = format!("{APIROOT}api/room");
             self.http.get(&url, |result| {
                 log::debug!("{:?}", result);
                 if let Ok(json) = result {
@@ -406,7 +406,7 @@ impl MainApp {
 
         let room = args.opt_str("r").unwrap_or("0".to_string());
         let player = args.opt_str("p").unwrap_or("0".to_string());
-        let url = format!("http://{SERVER}/api/room/{room}/{player}");
+        let url = format!("{APIROOT}api/room/{room}/{player}");
         let state = Rc::clone(&self.state);
         self.http.get(&url, move |result| {
             log::debug!("{:?}", result);

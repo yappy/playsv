@@ -11,6 +11,8 @@ use std::sync::RwLock;
 // from build system
 const GIT_VERSION: &str = git_version!();
 
+const PUBLIC_URL: &str = env!("PUBLIC_URL");
+
 // description, message, etc.
 const STRING_MAX: usize = 1024;
 
@@ -36,20 +38,29 @@ async fn info() -> impl Responder {
 }
 
 #[get("/")]
-async fn index(data: web::Data<AppState>) -> impl Responder {
-    // TODO: return wasm page?
+async fn root() -> impl Responder {
+    file_serve("index.html").await
+}
 
-    let mut msg = "".to_string();
-    {
-        // rlock
-        let rooms = data.rooms.read().unwrap();
-        for k in (*rooms).keys() {
-            msg.push_str(&format!("<p>{}</p>\n", k));
-        }
-        // unlock
+#[get("/{name}")]
+async fn index(path: web::Path<String>) -> impl Responder {
+    file_serve(&path).await
+}
+
+async fn file_serve(name: &str) -> impl Responder {
+    const INDEX: &str = include_str!(concat!(env!("OUT_DIR"), "/index.html"));
+    const JS: &str = include_str!(concat!(env!("OUT_DIR"), "/client.js"));
+    const WASM: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/client_bg.wasm"));
+
+    println!("GET /{name}");
+    match name {
+        "index.html" => HttpResponse::Ok().content_type("text/html").body(INDEX),
+        "client.js" => HttpResponse::Ok().content_type("text/javascript").body(JS),
+        "client_bg.wasm" => HttpResponse::Ok()
+            .content_type("application/wasm")
+            .body(WASM),
+        _ => HttpResponse::NotFound().body(""),
     }
-
-    HttpResponse::Ok().body(simple_html("Hello", &msg))
 }
 
 // Get/Add-to active game list
@@ -143,6 +154,7 @@ async fn main() -> std::io::Result<()> {
         rooms: Default::default(),
     });
 
+    println!("http://127.0.0.1:8888{PUBLIC_URL}/");
     // pass a function as App builder
     // move app_state into closure
     HttpServer::new(move || {
@@ -154,14 +166,15 @@ async fn main() -> std::io::Result<()> {
             .supports_credentials()
             .max_age(3600);
 
-        App::new()
-            .wrap(cors)
-            .app_data(app_state.clone())
+        App::new().wrap(cors).app_data(app_state.clone()).service(
+            web::scope(PUBLIC_URL)
+            .service(root)
             .service(index)
-            .service(info)
-            .service(get_rooms)
-            .service(post_room)
-            .service(get_room_id_player)
+                .service(info)
+                .service(get_rooms)
+                .service(post_room)
+                .service(get_room_id_player),
+        )
     })
     .bind("127.0.0.1:8888")?
     .run()

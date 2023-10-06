@@ -32,10 +32,3 @@ web-sys = { version = "0.3.64", features = [
 anyhow = "1.0.75"
 base64 = "0.21.4"
 glob = "0.3.1"
-
-# seems to have no effect for wasm...
-[profile.dev]
-panic = "abort"
-
-[profile.release]
-panic = "abort"
