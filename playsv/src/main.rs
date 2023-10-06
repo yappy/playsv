@@ -98,8 +98,8 @@ async fn post_room(
     // create a new game state
     let new_game = match mjgame::Game::new() {
         Ok(game) => game,
-        Err(msg) => {
-            return HttpResponse::BadRequest().json(jsif::ErrorMsg::new(msg));
+        Err(err) => {
+            return HttpResponse::BadRequest().json(jsif::ErrorMsg::new(err.to_string()));
         }
     };
 
@@ -137,7 +137,7 @@ async fn get_room_id_player(
             let view = game.0.get_view(player);
             match view {
                 Ok(result) => HttpResponse::Ok().json(result),
-                Err(msg) => HttpResponse::BadRequest().json(jsif::ErrorMsg::new(msg)),
+                Err(err) => HttpResponse::BadRequest().json(jsif::ErrorMsg::new(err.to_string())),
             }
         } else {
             HttpResponse::BadRequest().json(jsif::ErrorMsg::new("Invalid id".to_string()))
@@ -168,8 +168,8 @@ async fn main() -> std::io::Result<()> {
 
         App::new().wrap(cors).app_data(app_state.clone()).service(
             web::scope(PUBLIC_URL)
-            .service(root)
-            .service(index)
+                .service(root)
+                .service(index)
                 .service(info)
                 .service(get_rooms)
                 .service(post_room)
@@ -181,6 +181,7 @@ async fn main() -> std::io::Result<()> {
     .await
 }
 
+/*
 fn simple_html(title: &str, body: &str) -> String {
     format!(
         r#"<!DOCTYPE html>
@@ -197,3 +198,4 @@ fn simple_html(title: &str, body: &str) -> String {
         title, body
     )
 }
+*/

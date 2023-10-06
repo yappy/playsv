@@ -1,3 +1,4 @@
+use anyhow::{ensure, Result};
 use common::{jsif, mjsys};
 use rand::seq::SliceRandom;
 use std::sync::RwLock;
@@ -54,22 +55,19 @@ struct InternalState {
 }
 
 impl Game {
-    pub fn new() -> Result<Game, String> {
+    pub fn new() -> Result<Game> {
         let mut state = GameState::new();
         // TODO: pass rule config
-        match state.init() {
-            // After this, it is necessary to take a lock for GameState access
-            Ok(()) => Ok(Game(RwLock::new(state))),
-            Err(msg) => Err(msg),
-        }
+        state.init()?;
+
+        // After this, it is necessary to take a lock for GameState access
+        Ok(Game(RwLock::new(state)))
     }
 
-    pub fn get_view(&self, player: u32) -> Result<jsif::LocalView, String> {
+    pub fn get_view(&self, player: u32) -> Result<jsif::LocalView> {
         // read lock and (common, internal) <- state
         let GameState { common, internal } = &*self.0.read().unwrap();
-        if player >= common.player_count {
-            return Err("Invalid player: {}".to_string());
-        }
+        ensure!(player < common.player_count, "Invalid player: {}", player);
 
         // result struct for json output
         let result = jsif::LocalView {
@@ -159,7 +157,7 @@ impl GameState {
         assert!(common.turn < common.player_count);
     }
 
-    fn init(&mut self) -> Result<(), String> {
+    fn init(&mut self) -> Result<()> {
         let (common, internal) = (&mut self.common, &mut self.internal);
 
         // TODO: receive rule config and set
