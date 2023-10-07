@@ -27,6 +27,8 @@ web-sys = { version = "0.3.64", features = [
     "MouseEvent",
     "XmlHttpRequest",
 ]}
+rand = "0.8.5"
+getrandom = { version = "0.2.10", features = ["js"] }
 
 [build-dependencies]
 anyhow = "1.0.75"

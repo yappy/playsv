@@ -2,6 +2,7 @@ use crate::{
     asset,
     basesys::{App, BaseSys},
     net::PollingHttp,
+    testmode::{self, TestMode},
 };
 use anyhow::{bail, Result};
 use game::{jsif, mjsys};
@@ -9,7 +10,12 @@ use getopts::{Matches, Options};
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 use web_sys::{CanvasRenderingContext2d, HtmlImageElement};
 
-const APIROOT: &str = env!("TRUNK_BUILD_PUBLIC_URL");
+// On server build, TRUNK_BUILD_PUBLIC_URL will be specified by env
+const APIROOT: Option<&str> = option_env!("TRUNK_BUILD_PUBLIC_URL");
+
+fn apiroot() -> &'static str {
+    APIROOT.unwrap_or("/")
+}
 
 const CANVAS_W: u32 = 640;
 const CANVAS_H: u32 = 480;
@@ -22,8 +28,15 @@ struct DbgCmd {
 
 enum State {
     Init,
+    TestMode(Box<testmode::TestMode>),
     SelectRoom(Option<Box<jsif::RoomList>>),
     Main(Option<Box<jsif::LocalView>>),
+}
+
+#[derive(Default)]
+pub struct ImageSet {
+    // [kind][num]
+    pub pai: [Vec<HtmlImageElement>; 4],
 }
 
 struct MainApp {
@@ -36,8 +49,7 @@ struct MainApp {
     fps_count: u64,
     server_info: Rc<RefCell<Option<String>>>,
 
-    // [kind][num]
-    img_pai: [Vec<HtmlImageElement>; 4],
+    img_set: Rc<ImageSet>,
 
     dbg_cmds: HashMap<&'static str, DbgCmd>,
 }
@@ -48,10 +60,10 @@ impl MainApp {
 
         let http = PollingHttp::new();
 
+        let mut img_set: ImageSet = Default::default();
         let kind_table = ["ms", "ps", "ss"];
         let zu_table = ["", "ji_e", "ji_s", "ji_w", "ji_n", "no", "ji_h", "ji_c"];
-        let mut img_pai: [Vec<HtmlImageElement>; 4] = Default::default();
-        for (kind, &mut ref mut list) in img_pai.iter_mut().enumerate() {
+        for (kind, &mut ref mut list) in img_set.pai.iter_mut().enumerate() {
             let is_zu = kind == 3;
             let maxnum = if is_zu { 7 } else { 9 };
 
@@ -72,9 +84,14 @@ impl MainApp {
                 list.push(img);
             }
         }
+        let img_set = Rc::new(img_set);
+
+        //let initial_state = State::Init;
+        let initial_state = State::TestMode(Box::new(TestMode::new(Rc::clone(&img_set))));
+        let state = Rc::new(RefCell::new(initial_state));
 
         Self {
-            state: Rc::new(RefCell::new(State::Init)),
+            state,
 
             http,
             frame: 0,
@@ -83,7 +100,7 @@ impl MainApp {
             fps_count: 0,
             server_info: Rc::new(RefCell::new(None)),
 
-            img_pai,
+            img_set,
 
             dbg_cmds,
         }
@@ -92,7 +109,9 @@ impl MainApp {
 
 impl App for MainApp {
     fn init(&mut self) {
-        let url = format!("{APIROOT}api/info");
+        // Get room data and go to SelectRoom state.
+        /*
+        let url = format!("{}api/info", apiroot());
         let dest = Rc::clone(&self.server_info);
         self.http.get(&url, move |result| {
             let info: jsif::ServerInfo = serde_json::from_str(result.expect("HTTP request error"))
@@ -100,7 +119,7 @@ impl App for MainApp {
             *dest.borrow_mut() = Some(format!("{}\n{}", info.version, info.description));
         });
 
-        let url = format!("{APIROOT}api/room");
+        let url = format!("{}api/room", apiroot());
         let dest = Rc::clone(&self.state);
         self.http.get(&url, move |result| {
             let rooms: jsif::RoomList = serde_json::from_str(result.expect("HTTP request error"))
@@ -108,6 +127,7 @@ impl App for MainApp {
             *dest.borrow_mut() = State::SelectRoom(Some(Box::new(rooms)));
         });
         *self.state.borrow_mut() = State::SelectRoom(None);
+        */
     }
 
     fn frame(&mut self) {
@@ -127,11 +147,11 @@ impl App for MainApp {
     }
 
     fn render(&mut self, context: &CanvasRenderingContext2d, width: u32, height: u32) {
-        let t = self.frame as u8;
         context.save();
 
         // clear
-        let color = format!("#{0:>02x}{0:>02x}{0:>02x}", t);
+        //let color = format!("#{0:>02x}{0:>02x}{0:>02x}", t);
+        let color = "darkgreen";
         context.set_fill_style(&color.into());
         context.fill_rect(0.0, 0.0, width as f64, height as f64);
 
@@ -156,6 +176,9 @@ impl App for MainApp {
         let state = &*self.state.borrow();
         match state {
             State::Init => {}
+            State::TestMode(tm) => {
+                tm.render(context, width, height);
+            }
             State::SelectRoom(rooms) => {
                 self.render_select_room(context, rooms);
             }
@@ -216,7 +239,7 @@ impl MainApp {
         for &pai in view.local.hands[0].iter() {
             let (kind, num) = mjsys::decode(pai as u8).unwrap();
 
-            let img = &self.img_pai[kind as usize][num as usize - 1];
+            let img = &self.img_set.pai[kind as usize][num as usize - 1];
             let w = img.width() as f64;
             context
                 .draw_image_with_html_image_element(img, x, 250.0)
@@ -370,7 +393,7 @@ impl MainApp {
         }
 
         if let Some(comment) = args.opt_str("c") {
-            let url = format!("{APIROOT}api/room");
+            let url = format!("{}api/room", apiroot());
             let param = jsif::CreateRoom {
                 comment: comment.clone(),
             };
@@ -383,7 +406,7 @@ impl MainApp {
                 }
             });
         } else {
-            let url = format!("{APIROOT}api/room");
+            let url = format!("{}api/room", apiroot());
             self.http.get(&url, |result| {
                 log::debug!("{:?}", result);
                 if let Ok(json) = result {
@@ -406,7 +429,7 @@ impl MainApp {
 
         let room = args.opt_str("r").unwrap_or("0".to_string());
         let player = args.opt_str("p").unwrap_or("0".to_string());
-        let url = format!("{APIROOT}api/room/{room}/{player}");
+        let url = format!("{}api/room/{room}/{player}", apiroot());
         let state = Rc::clone(&self.state);
         self.http.get(&url, move |result| {
             log::debug!("{:?}", result);
