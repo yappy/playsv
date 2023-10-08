@@ -1,5 +1,5 @@
 use crate::mainapp::{HitBox, ImageSet};
-use game::mjsys::{self, PAI_COUNT_U8};
+use game::mjsys::{self, Hand, PointParam, Reach, PAI_COUNT_U8};
 use rand::prelude::*;
 use std::rc::Rc;
 use web_sys::CanvasRenderingContext2d;
@@ -13,6 +13,8 @@ pub struct TestMode {
     hand_hit: Vec<HitBox>,
     finish: Option<u8>,
     finish_hit: Option<HitBox>,
+
+    judge_string: Vec<String>,
 }
 
 impl TestMode {
@@ -62,8 +64,10 @@ impl TestMode {
             hand_hit: Default::default(),
             finish,
             finish_hit: None,
+            judge_string: Default::default(),
         };
         s.update_hitbox();
+        s.update_judge();
 
         s
     }
@@ -88,6 +92,61 @@ impl TestMode {
             self.finish_hit = Some(HitBox::from_image(img, x, y));
         } else {
             self.finish_hit = None;
+        }
+    }
+
+    fn judge(&self) -> Vec<String> {
+        let mut texts = Vec::new();
+
+        log::info!("{:?}, {}", self.hand, self.finish.unwrap());
+
+        let mut hand = Hand {
+            finish_pai: self.finish,
+            tumo: true,
+            ..Default::default()
+        };
+        mjsys::to_bucket(&mut hand.bucket, &self.hand);
+        let param = PointParam {
+            field_wind: 0,
+            self_wind: 0,
+            reach: Reach::None,
+            ..Default::default()
+        };
+        let mut result = Vec::new();
+        if let Err(e) = mjsys::all_finish_patterns(&mut hand, &mut result) {
+            texts.push("Error: contact the author.".to_string());
+            texts.push(format!("{:?}", e));
+            return texts;
+        }
+        if result.is_empty() {
+            texts.push("錯和".to_string());
+            return texts;
+        }
+
+        for r in result.iter() {
+            log::info!("{:?}", r);
+        }
+
+        let mut points: Vec<_> = result
+            .iter()
+            .map(|r| mjsys::calc_base_point(r, &param))
+            .collect();
+        points.sort_by(|a, b| b.cmp(a));
+
+        texts
+    }
+
+    fn update_judge(&mut self) {
+        self.judge_string.clear();
+
+        assert!(self.hand.len() <= mjsys::HAND_BEFORE_DRAW);
+        if self.hand.len() == mjsys::HAND_BEFORE_DRAW {
+            if self.finish.is_some() {
+                let texts = self.judge();
+                self.judge_string.extend(texts);
+            }
+        } else {
+            self.judge_string.push("少牌".to_string());
         }
     }
 
@@ -120,6 +179,15 @@ impl TestMode {
             context
                 .draw_image_with_html_image_element(img, hit.x as f64, hit.y as f64)
                 .unwrap();
+        }
+
+        // judge string
+        let mut jy = 50;
+        for line in self.judge_string.iter() {
+            context.set_fill_style(&"white".to_string().into());
+            context.set_font("32px serif");
+            context.fill_text(&line, 50.0, jy as f64).unwrap();
+            jy += 32;
         }
     }
 
@@ -166,5 +234,6 @@ impl TestMode {
         }
         self.hand.sort();
         self.update_hitbox();
+        self.update_judge();
     }
 }

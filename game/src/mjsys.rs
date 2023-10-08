@@ -264,12 +264,12 @@ impl Mianzi {
 #[derive(Debug, Clone)]
 pub struct Hand {
     // pai count = bucket[encoded_pai]
-    bucket: [u8; PAI_COUNT],
-    mianzi_list: Vec<Mianzi>,
-    head: Option<u8>,
+    pub bucket: [u8; PAI_COUNT],
+    pub mianzi_list: Vec<Mianzi>,
+    pub head: Option<u8>,
     // search all if None
-    finish_pai: Option<u8>,
-    tumo: bool,
+    pub finish_pai: Option<u8>,
+    pub tumo: bool,
 }
 
 impl Default for Hand {
@@ -356,18 +356,18 @@ pub enum Reach {
 // ref. https://blog.kobalab.net/entry/20151221/1450624780
 pub struct PointParam {
     // 0, 1, 2, 3
-    field_wind: u8,
+    pub field_wind: u8,
     // 0, 1, 2, 3; Parent if 0
-    self_wind: u8,
-    reach: Reach,
-    reach_first: bool,
-    chankan: bool,
-    lingshang: bool,
-    haitei: bool,
-    houtei: bool,
-    tenchi: bool,
-    dora: Vec<u8>,
-    ura: Vec<u8>,
+    pub self_wind: u8,
+    pub reach: Reach,
+    pub reach_first: bool,
+    pub chankan: bool,
+    pub lingshang: bool,
+    pub haitei: bool,
+    pub houtei: bool,
+    pub tenchi: bool,
+    pub dora: Vec<u8>,
+    pub ura: Vec<u8>,
 }
 
 impl PointParam {
