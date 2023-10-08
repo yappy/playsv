@@ -435,7 +435,7 @@ fn check_finish(pai1: u8, pai2: u8, finish_pai: u8, hand: &Hand) -> Option<Finis
         let mut mianzi_list = hand.mianzi_list.clone();
         mianzi_list.push(Mianzi {
             mtype: MianziType::Ordered,
-            pai: n1.min(nf),
+            pai: pai1.min(finish_pai),
         });
         Some(FinishHand {
             finish_type: FinishType::Penchan,
@@ -448,7 +448,7 @@ fn check_finish(pai1: u8, pai2: u8, finish_pai: u8, hand: &Hand) -> Option<Finis
         let mut mianzi_list = hand.mianzi_list.clone();
         mianzi_list.push(Mianzi {
             mtype: MianziType::Ordered,
-            pai: n1,
+            pai: pai1,
         });
         Some(FinishHand {
             finish_type: FinishType::Kanchan,
@@ -461,7 +461,7 @@ fn check_finish(pai1: u8, pai2: u8, finish_pai: u8, hand: &Hand) -> Option<Finis
         let mut mianzi_list = hand.mianzi_list.clone();
         mianzi_list.push(Mianzi {
             mtype: MianziType::Ordered,
-            pai: n1.min(nf),
+            pai: pai1.min(finish_pai),
         });
         Some(FinishHand {
             finish_type: FinishType::Ryanmen,
