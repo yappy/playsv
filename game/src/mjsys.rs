@@ -337,11 +337,11 @@ impl FinishHand {
 // The order means priorities for sort keys
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Point {
-    base_point: u32,
-    fan: u32,
-    fu: u32,
+    pub base_point: u32,
+    pub fan: u32,
+    pub fu: u32,
     // YAKU*
-    yaku: u64,
+    pub yaku: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]

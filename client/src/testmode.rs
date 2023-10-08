@@ -123,15 +123,15 @@ impl TestMode {
             return texts;
         }
 
-        for r in result.iter() {
-            log::info!("{:?}", r);
-        }
-
         let mut points: Vec<_> = result
             .iter()
             .map(|r| mjsys::calc_base_point(r, &param))
             .collect();
         points.sort_by(|a, b| b.cmp(a));
+
+        let point = &points[0];
+        let p_tumo = mjsys::calc_point_p_tumo(point.base_point);
+        texts.push(format!("{}符 {}翻 {}all", point.fu, point.fan, p_tumo));
 
         texts
     }
