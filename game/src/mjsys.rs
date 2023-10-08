@@ -344,6 +344,64 @@ pub struct Point {
     pub yaku: u64,
 }
 
+impl Point {
+    // x1, x2, x4, x6
+    // Child : {1}, {2} or Ron {4}
+    // Parent: {2} all or Ron {6}
+
+    pub fn calc_point_p_tumo(&self) -> u32 {
+        assert!(self.base_point <= 2000);
+
+        match self.fan {
+            0..=4 => roundup100(self.base_point * 2),
+            5 => 4000,
+            6..=7 => 6000,
+            8..=10 => 8000,
+            11..=12 => 12000,
+            13.. => 16000,
+        }
+    }
+
+    pub fn calc_point_p_ron(&self) -> u32 {
+        assert!(self.base_point <= 2000);
+
+        match self.fan {
+            0..=4 => roundup100(self.base_point * 6),
+            5 => 12000,
+            6..=7 => 18000,
+            8..=10 => 24000,
+            11..=12 => 36000,
+            13.. => 48000,
+        }
+    }
+
+    pub fn calc_point_c_tumo(&self) -> (u32, u32) {
+        assert!(self.base_point <= 2000);
+
+        match self.fan {
+            0..=4 => (roundup100(self.base_point), roundup100(self.base_point * 2)),
+            5 => (2000, 4000),
+            6..=7 => (3000, 6000),
+            8..=10 => (4000, 8000),
+            11..=12 => (6000, 12000),
+            13.. => (8000, 16000),
+        }
+    }
+
+    pub fn calc_point_c_ron(&self) -> u32 {
+        assert!(self.base_point <= 2000);
+
+        match self.fan {
+            0..=4 => roundup100(self.base_point * 4),
+            5 => 8000,
+            6..=7 => 12000,
+            8..=10 => 16000,
+            11..=12 => 24000,
+            13.. => 36000,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Default)]
 pub enum Reach {
     #[default]
@@ -689,34 +747,6 @@ fn roundup100(x: u32) -> u32 {
     (x + 99) / 100 * 100
 }
 
-// x1, x2, x4, x6
-// Child : {1}, {2} or Ron {4}
-// Parent: {2} all or Ron {6}
-
-pub fn calc_point_p_tumo(base_point: u32) -> u32 {
-    assert!(base_point <= 2000);
-
-    roundup100(base_point * 2)
-}
-
-pub fn calc_point_p_ron(base_point: u32) -> u32 {
-    assert!(base_point <= 2000);
-
-    roundup100(base_point * 6)
-}
-
-pub fn calc_point_c_tumo(base_point: u32) -> (u32, u32) {
-    assert!(base_point <= 2000);
-
-    (roundup100(base_point), roundup100(base_point * 2))
-}
-
-pub fn calc_point_c_ron(base_point: u32) -> u32 {
-    assert!(base_point <= 2000);
-
-    roundup100(base_point * 4)
-}
-
 // -----------------------------------------------------------------------------
 
 #[cfg(test)]
@@ -842,19 +872,19 @@ mod tests {
 
         for (i1, &fan) in fan_list.iter().enumerate() {
             for (i2, &fu) in fu_list.iter().enumerate() {
-                let base = calc_base_point_direct(fan, fu, 0).base_point;
+                let point = calc_base_point_direct(fan, fu, 0);
 
                 if p_ron[i1][i2] != 0 {
-                    assert_eq!(p_ron[i1][i2], calc_point_p_ron(base));
+                    assert_eq!(p_ron[i1][i2], point.calc_point_p_ron());
                 }
                 if p_tumo[i1][i2] != 0 {
-                    assert_eq!(p_tumo[i1][i2], calc_point_p_tumo(base));
+                    assert_eq!(p_tumo[i1][i2], point.calc_point_p_tumo());
                 }
                 if c_ron[i1][i2] != 0 {
-                    assert_eq!(c_ron[i1][i2], calc_point_c_ron(base));
+                    assert_eq!(c_ron[i1][i2], point.calc_point_c_ron());
                 }
                 if c_tumo[i1][i2] != (0, 0) {
-                    assert_eq!(c_tumo[i1][i2], calc_point_c_tumo(base));
+                    assert_eq!(c_tumo[i1][i2], point.calc_point_c_tumo());
                 }
             }
         }
@@ -924,7 +954,7 @@ mod tests {
         let mut points: Vec<_> = result.iter().map(|r| calc_base_point(r, &param)).collect();
         points.sort_by(|a, b| b.cmp(a));
 
-        assert_eq!((1200, 2300), calc_point_c_tumo(points[0].base_point));
+        assert_eq!((1200, 2300), points[0].calc_point_c_tumo());
 
         Ok(())
     }

@@ -130,7 +130,7 @@ impl TestMode {
         points.sort_by(|a, b| b.cmp(a));
 
         let point = &points[0];
-        let p_tumo = mjsys::calc_point_p_tumo(point.base_point);
+        let p_tumo = point.calc_point_p_tumo();
         texts.push(format!("{}符 {}翻 {}all", point.fu, point.fan, p_tumo));
 
         texts
