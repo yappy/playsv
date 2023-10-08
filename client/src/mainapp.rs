@@ -28,7 +28,7 @@ struct DbgCmd {
 
 enum State {
     Init,
-    TestMode(Box<testmode::TestMode>),
+    TestMode,
     SelectRoom(Option<Box<jsif::RoomList>>),
     Main(Option<Box<jsif::LocalView>>),
 }
@@ -37,6 +37,28 @@ enum State {
 pub struct ImageSet {
     // [kind][num]
     pub pai: [Vec<HtmlImageElement>; 4],
+}
+
+pub struct HitBox {
+    pub x: i32,
+    pub y: i32,
+    pub w: i32,
+    pub h: i32,
+}
+
+impl HitBox {
+    pub fn from_image(img: &HtmlImageElement, x: u32, y: u32) -> Self {
+        Self {
+            x: x as i32,
+            y: y as i32,
+            w: img.width() as i32,
+            h: img.height() as i32,
+        }
+    }
+
+    pub fn hit(&self, x: i32, y: i32) -> bool {
+        x >= self.x && x < self.x + self.w && y >= self.y && y < self.y + self.h
+    }
 }
 
 struct MainApp {
@@ -50,6 +72,8 @@ struct MainApp {
     server_info: Rc<RefCell<Option<String>>>,
 
     img_set: Rc<ImageSet>,
+
+    test_mode: testmode::TestMode,
 
     dbg_cmds: HashMap<&'static str, DbgCmd>,
 }
@@ -87,8 +111,10 @@ impl MainApp {
         let img_set = Rc::new(img_set);
 
         //let initial_state = State::Init;
-        let initial_state = State::TestMode(Box::new(TestMode::new(Rc::clone(&img_set))));
+        let initial_state = State::TestMode;
         let state = Rc::new(RefCell::new(initial_state));
+
+        let test_mode = TestMode::new(Rc::clone(&img_set));
 
         Self {
             state,
@@ -101,6 +127,8 @@ impl MainApp {
             server_info: Rc::new(RefCell::new(None)),
 
             img_set,
+
+            test_mode,
 
             dbg_cmds,
         }
@@ -176,8 +204,8 @@ impl App for MainApp {
         let state = &*self.state.borrow();
         match state {
             State::Init => {}
-            State::TestMode(tm) => {
-                tm.render(context, width, height);
+            State::TestMode => {
+                self.test_mode.render(context, width, height);
             }
             State::SelectRoom(rooms) => {
                 self.render_select_room(context, rooms);
@@ -185,6 +213,16 @@ impl App for MainApp {
             State::Main(view) => {
                 self.render_game_main(context, view);
             }
+        }
+    }
+
+    fn on_mouse_click(&mut self, event: &web_sys::MouseEvent) {
+        let state = &*self.state.borrow();
+        match state {
+            State::TestMode => {
+                self.test_mode.click(event.x(), event.y());
+            }
+            _ => {}
         }
     }
 
