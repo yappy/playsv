@@ -20,6 +20,8 @@ use yaku::Yaku;
 
 pub const PAI_COUNT: usize = 34;
 pub const PAI_COUNT_U8: u8 = 34;
+pub const HAND_BEFORE_DRAW: usize = 13;
+pub const HAND_AFTER_DRAW: usize = 14;
 pub const OFFSET_M: u8 = 0;
 pub const OFFSET_P: u8 = 9;
 pub const OFFSET_S: u8 = 18;
