@@ -711,7 +711,7 @@ pub fn calc_base_point(hand: &FinishHand, param: &PointParam) -> Point {
 
     let mut yaku = yaku::check_yaku(hand, param, menzen);
     let fu = calc_fu(hand, param, menzen);
-    if menzen && fu == 20 {
+    if menzen && (hand.tumo && fu == 20) || (!hand.tumo && fu == 30) {
         yaku |= yaku::Yaku::PINHU.0;
     }
 
