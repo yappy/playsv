@@ -1,5 +1,9 @@
 use crate::mainapp::{HitBox, ImageSet};
-use game::mjsys::{self, Hand, PointParam, Reach, PAI_COUNT_U8};
+use game::mjsys::{
+    self,
+    yaku::{self, Yaku},
+    Hand, PointParam, Reach, PAI_COUNT_U8,
+};
 use rand::prelude::*;
 use std::rc::Rc;
 use web_sys::CanvasRenderingContext2d;
@@ -95,20 +99,20 @@ impl TestMode {
         }
     }
 
-    fn judge(&self) -> Vec<String> {
+    fn judge(&self, tumo: bool, field_wind: u8, self_wind: u8) -> Vec<String> {
         let mut texts = Vec::new();
 
         log::info!("{:?}, {}", self.hand, self.finish.unwrap());
 
         let mut hand = Hand {
             finish_pai: self.finish,
-            tumo: true,
+            tumo,
             ..Default::default()
         };
         mjsys::to_bucket(&mut hand.bucket, &self.hand);
         let param = PointParam {
-            field_wind: 0,
-            self_wind: 0,
+            field_wind,
+            self_wind,
             reach: Reach::None,
             ..Default::default()
         };
@@ -133,6 +137,9 @@ impl TestMode {
         let p_tumo = point.calc_point_p_tumo();
         texts.push(format!("{}符 {}翻 {}all", point.fu, point.fan, p_tumo));
 
+        let yakus = Yaku::to_japanese_list(point.yaku);
+        texts.extend(yakus.iter().map(|s| s.to_string()));
+
         texts
     }
 
@@ -142,7 +149,10 @@ impl TestMode {
         assert!(self.hand.len() <= mjsys::HAND_BEFORE_DRAW);
         if self.hand.len() == mjsys::HAND_BEFORE_DRAW {
             if self.finish.is_some() {
-                let texts = self.judge();
+                let texts = self.judge(true, 0, 0);
+                self.judge_string.extend(texts);
+                self.judge_string.push("".to_string());
+                let texts = self.judge(false, 0, 0);
                 self.judge_string.extend(texts);
             }
         } else {
@@ -182,12 +192,13 @@ impl TestMode {
         }
 
         // judge string
+        const FONT_H: u32 = 16;
         let mut jy = 50;
         for line in self.judge_string.iter() {
             context.set_fill_style(&"white".to_string().into());
-            context.set_font("32px serif");
-            context.fill_text(&line, 50.0, jy as f64).unwrap();
-            jy += 32;
+            context.set_font(&format!("{FONT_H}px serif"));
+            context.fill_text(&line, 20.0, jy as f64).unwrap();
+            jy += FONT_H;
         }
     }
 

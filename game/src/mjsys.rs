@@ -12,7 +12,7 @@ Encoding:
 ji   : 27-33
 */
 
-mod yaku;
+pub mod yaku;
 
 use anyhow::{anyhow, bail, ensure, Result};
 
