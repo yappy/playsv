@@ -7,11 +7,15 @@ use std::{
 
 fn trunk_build_release(out_dir: &Path) -> Result<()> {
     const PROJ_ROOT: &str = "../client";
+    const PROJ_DEP: [&str; 1] = ["../game"];
     const DIST: &str = "dist_release";
     const PUBLIC_URL: &str = "/playsv";
 
     println!("cargo:rerun-if-changed={PROJ_ROOT}/build.rs");
     println!("cargo:rerun-if-changed={PROJ_ROOT}/src");
+    for dep in PROJ_DEP {
+        println!("cargo:rerun-if-changed={dep}/src");
+    }
 
     println!("cargo:rustc-env=PUBLIC_URL={PUBLIC_URL}");
 
