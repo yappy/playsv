@@ -182,7 +182,7 @@ pub async fn server_main(port: u16, cors_enable: bool) -> Result<()> {
                 .service(get_room_id_player),
         )
     })
-    .bind(format!("127.0.0.1:{port}"))?
+    .bind(("127.0.0.1", port))?
     .run()
     .await?;
 
