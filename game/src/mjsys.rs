@@ -20,12 +20,17 @@ use yaku::Yaku;
 
 pub const PAI_COUNT: usize = 34;
 pub const PAI_COUNT_U8: u8 = 34;
+pub const PAI_INVALID: u8 = 0xff;
 pub const HAND_BEFORE_DRAW: usize = 13;
 pub const HAND_AFTER_DRAW: usize = 14;
 pub const OFFSET_M: u8 = 0;
 pub const OFFSET_P: u8 = 9;
 pub const OFFSET_S: u8 = 18;
 pub const OFFSET_Z: u8 = 27;
+pub const KIND_M: u8 = 0;
+pub const KIND_P: u8 = 1;
+pub const KIND_S: u8 = 2;
+pub const KIND_Z: u8 = 3;
 
 fn validate(kind: u8, num: u8) -> Result<()> {
     ensure!(kind <= 3, "Invalid kind: {kind}");
@@ -56,7 +61,7 @@ pub fn encode(kind: u8, num: u8) -> Result<u8> {
 pub fn is_ji(code: u8) -> Result<bool> {
     let (kind, _num) = decode(code)?;
 
-    Ok(kind == 3)
+    Ok(kind == KIND_Z)
 }
 
 pub fn is_num(code: u8) -> Result<bool> {
@@ -66,19 +71,19 @@ pub fn is_num(code: u8) -> Result<bool> {
 pub fn is_sangen(code: u8) -> Result<bool> {
     let (kind, num) = decode(code)?;
 
-    Ok(kind == 3 && (5..7).contains(&num))
+    Ok(kind == KIND_Z && (5..7).contains(&num))
 }
 
 pub fn is_yao(code: u8) -> Result<bool> {
     let (kind, num) = decode(code)?;
 
-    Ok(kind == 3 || num == 1 || num == 9)
+    Ok(kind == KIND_Z || num == 1 || num == 9)
 }
 
 pub fn is_jun(code: u8) -> Result<bool> {
     let (kind, num) = decode(code)?;
 
-    Ok(kind < 3 && (num == 1 || num == 9))
+    Ok(kind < KIND_Z && (num == 1 || num == 9))
 }
 
 pub fn is_tanyao(code: u8) -> Result<bool> {
@@ -94,10 +99,10 @@ pub fn to_human_readable_string(code: u8) -> Result<String> {
 
 fn char_to_kind(c: char) -> Result<u8> {
     let kind = match c {
-        'm' => 0,
-        'p' => 1,
-        's' => 2,
-        'z' => 3,
+        'm' => KIND_M,
+        'p' => KIND_P,
+        's' => KIND_S,
+        'z' => KIND_Z,
         _ => bail!("Invalid character"),
     };
 
@@ -199,6 +204,8 @@ pub enum MianziType {
     SameKanBlind,
     // kan_from (0 = self kan)
     SameKanOpen,
+    // special: chitoi
+    Chitoi,
 }
 
 impl MianziType {
@@ -207,18 +214,28 @@ impl MianziType {
     }
 
     pub fn is_same(&self) -> bool {
-        !self.is_ordered()
+        matches!(
+            self,
+            Self::Same | Self::SameRon | Self::SamePon | Self::SameKanBlind | Self::SameKanOpen
+        )
+    }
+
+    pub fn is_chitoi(&self) -> bool {
+        matches!(self, Self::Chitoi)
     }
 
     pub fn is_menzen(&self) -> bool {
         matches!(
             self,
-            Self::Ordered | Self::Same | Self::SameRon | Self::SameKanBlind
+            Self::Ordered | Self::Same | Self::SameRon | Self::SameKanBlind | Self::Chitoi,
         )
     }
 
     pub fn is_blind(&self) -> bool {
-        matches!(self, Self::Ordered | Self::Same | Self::SameKanBlind)
+        matches!(
+            self,
+            Self::Ordered | Self::Same | Self::SameKanBlind | Self::Chitoi
+        )
     }
 
     pub fn is_open(&self) -> bool {
@@ -237,6 +254,12 @@ pub struct Mianzi {
 }
 
 impl Mianzi {
+    pub fn color(&self) -> u8 {
+        let (kind, _num) = decode(self.pai).unwrap();
+
+        kind
+    }
+
     pub fn is_tanyao(&self) -> bool {
         if self.mtype.is_ordered() {
             let (_kind, num) = decode(self.pai).unwrap();
@@ -284,8 +307,10 @@ impl Default for Hand {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum FinishType {
+    Chitoi,
+    Kokushi,
     Ryanmen,
     Kanchan,
     Penchan,
@@ -296,6 +321,8 @@ pub enum FinishType {
 impl FinishType {
     pub fn fu(&self) -> u32 {
         match self {
+            FinishType::Chitoi => 5,
+            FinishType::Kokushi => 0,
             FinishType::Ryanmen | FinishType::Shabo => 0,
             FinishType::Kanchan | FinishType::Penchan | FinishType::Tanki => 2,
         }
@@ -307,8 +334,9 @@ pub struct FinishHand {
     finish_type: FinishType,
     // if not tanki, the last element includes finish_pai
     mianzi_list: Vec<Mianzi>,
+    // None only if chitoi
     // if tanki, head = finish_pai
-    head: u8,
+    head: Option<u8>,
     finish_pai: u8,
     tumo: bool,
 }
@@ -316,14 +344,16 @@ pub struct FinishHand {
 impl FinishHand {
     pub fn to_pai_list(&self) -> Vec<u8> {
         let mut result = Vec::new();
-        result.push(self.head);
-        result.push(self.head);
+        if let Some(head) = self.head {
+            result.push(head);
+            result.push(head);
+        }
         for m in self.mianzi_list.iter() {
             if m.mtype.is_ordered() {
                 result.push(m.pai);
                 result.push(m.pai + 1);
                 result.push(m.pai + 2);
-            } else {
+            } else if m.mtype.is_same() {
                 result.push(m.pai);
                 result.push(m.pai);
                 result.push(m.pai);
@@ -450,13 +480,73 @@ pub fn to_bucket(dst: &mut [u8; PAI_COUNT], src: &[u8]) {
 }
 
 pub fn all_finish_patterns(hand: &mut Hand, result: &mut Vec<FinishHand>) -> Result<()> {
+    finish_chitoi(hand, result)?;
+    finish_kokushi(hand, result)?;
     finish_patterns(false, hand, 0, result)?;
     finish_patterns(true, hand, 0, result)?;
 
     Ok(())
 }
 
+fn finish_chitoi(hand: &Hand, result: &mut Vec<FinishHand>) -> Result<()> {
+    let mut wait: Option<u8> = None;
+    let mut mianzi_list: Vec<Mianzi> = Vec::new();
+
+    for (pai, count) in hand.bucket.iter().enumerate() {
+        let paiu8 = pai as u8;
+        match count {
+            0 => {}
+            1 => {
+                if wait.is_some() {
+                    return Ok(());
+                } else {
+                    wait = Some(paiu8);
+                }
+                mianzi_list.push(Mianzi {
+                    mtype: MianziType::Chitoi,
+                    pai: paiu8,
+                });
+            }
+            2 => {
+                mianzi_list.push(Mianzi {
+                    mtype: MianziType::Chitoi,
+                    pai: paiu8,
+                });
+            }
+            _ => {
+                return Ok(());
+            }
+        }
+    }
+
+    if let Some(fp) = hand.finish_pai {
+        result.push(FinishHand {
+            finish_type: FinishType::Chitoi,
+            mianzi_list,
+            head: None,
+            finish_pai: fp,
+            tumo: hand.tumo,
+        });
+    } else {
+        result.push(FinishHand {
+            finish_type: FinishType::Chitoi,
+            mianzi_list,
+            head: None,
+            finish_pai: wait.expect("Tenpai but no wait"),
+            tumo: hand.tumo,
+        });
+    }
+
+    Ok(())
+}
+
+fn finish_kokushi(hand: &Hand, result: &mut Vec<FinishHand>) -> Result<()> {
+    //TODO
+    Ok(())
+}
+
 fn check_finish(pai1: u8, pai2: u8, finish_pai: u8, hand: &Hand) -> Option<FinishHand> {
+    assert!(hand.head.is_some());
     assert!(pai1 <= pai2);
 
     // triple finish
@@ -472,7 +562,7 @@ fn check_finish(pai1: u8, pai2: u8, finish_pai: u8, hand: &Hand) -> Option<Finis
         return Some(FinishHand {
             finish_type: FinishType::Shabo,
             mianzi_list,
-            head: hand.head.unwrap(),
+            head: hand.head,
             finish_pai,
             tumo: hand.tumo,
         });
@@ -498,7 +588,7 @@ fn check_finish(pai1: u8, pai2: u8, finish_pai: u8, hand: &Hand) -> Option<Finis
         Some(FinishHand {
             finish_type: FinishType::Penchan,
             mianzi_list,
-            head: hand.head.unwrap(),
+            head: hand.head,
             finish_pai,
             tumo: hand.tumo,
         })
@@ -511,7 +601,7 @@ fn check_finish(pai1: u8, pai2: u8, finish_pai: u8, hand: &Hand) -> Option<Finis
         Some(FinishHand {
             finish_type: FinishType::Kanchan,
             mianzi_list,
-            head: hand.head.unwrap(),
+            head: hand.head,
             finish_pai,
             tumo: hand.tumo,
         })
@@ -524,7 +614,7 @@ fn check_finish(pai1: u8, pai2: u8, finish_pai: u8, hand: &Hand) -> Option<Finis
         Some(FinishHand {
             finish_type: FinishType::Ryanmen,
             mianzi_list,
-            head: hand.head.unwrap(),
+            head: hand.head,
             finish_pai,
             tumo: hand.tumo,
         })
@@ -569,7 +659,7 @@ fn finish_patterns(
                 result.push(FinishHand {
                     finish_type: FinishType::Tanki,
                     mianzi_list: hand.mianzi_list.clone(),
-                    head: pai,
+                    head: Some(pai),
                     finish_pai: pai,
                     tumo: hand.tumo,
                 })
@@ -654,6 +744,12 @@ fn finish_patterns(
 fn calc_fu(hand: &FinishHand, param: &PointParam, menzen: bool) -> u32 {
     let mut fu = 20;
 
+    // wait
+    fu += hand.finish_type.fu();
+    // if special form, return
+    if matches!(hand.finish_type, FinishType::Chitoi | FinishType::Kokushi) {
+        return fu;
+    }
     // mianzi
     for &m in hand.mianzi_list.iter() {
         let mut tmp = match m.mtype {
@@ -662,26 +758,24 @@ fn calc_fu(hand: &FinishHand, param: &PointParam, menzen: bool) -> u32 {
             MianziType::SamePon | MianziType::SameRon => 2,
             MianziType::SameKanBlind => 16,
             MianziType::SameKanOpen => 8,
+            MianziType::Chitoi => {
+                panic!("Must not reach");
+            }
         };
         if is_yao(m.pai).unwrap() {
             tmp *= 2;
         }
         fu += tmp;
     }
-    // wait
-    fu += match hand.finish_type {
-        FinishType::Ryanmen | FinishType::Shabo => 0,
-        FinishType::Penchan | FinishType::Kanchan | FinishType::Tanki => 2,
-    };
     // head
     {
         let mut tmp = 0;
-        let head = hand.head;
-        if is_sangen(head).unwrap() || hand.head == param.self_wind_pi() {
+        let head = hand.head.unwrap();
+        if is_sangen(head).unwrap() || head == param.self_wind_pi() {
             tmp += 2;
         }
         // NOTICE: by rule option
-        if hand.head == param.field_wind_pi() {
+        if head == param.field_wind_pi() {
             tmp += 2;
         }
         fu += tmp;
@@ -730,7 +824,8 @@ pub fn calc_base_point(hand: &FinishHand, param: &PointParam) -> Point {
 }
 
 pub fn calc_base_point_direct(fan: u32, fu: u32, yaku: u64) -> Point {
-    // NOTICE: 7700 or 8000 rule
+    // TODO: 7700 or 8000 rule
+
     // mangan limit
     let base_point = if fan < 5 { fu << (fan + 2) } else { 2000 };
     let base_point = base_point.min(2000);
@@ -937,11 +1032,41 @@ mod tests {
     }
 
     #[test]
+    fn chitoi() -> Result<()> {
+        fn test(input: &str) -> Result<Option<Point>> {
+            let mut hand = from_human_readable_string(input)?;
+            let mut result = Vec::new();
+            all_finish_patterns(&mut hand, &mut result)?;
+
+            let param = PointParam {
+                field_wind: 0,
+                self_wind: 2,
+                reach: Reach::Single,
+                ..Default::default()
+            };
+
+            let mut points: Vec<_> = result.iter().map(|r| calc_base_point(r, &param)).collect();
+            points.sort();
+
+            Ok(points.pop())
+        }
+
+        let point = test("115599m115599p11s")?.unwrap();
+        //println!("{:?}", point);
+        //println!("{:?}", Yaku::to_japanese_list(point.yaku));
+        // Reach, Tumo, Chitoi
+        assert!(point.fan == 4);
+        assert!(point.fu == 25);
+
+        Ok(())
+    }
+
+    #[test]
     fn practical() -> Result<()> {
         // https://mj-station.net/question/pointpractice3/
 
         let mut hand = from_human_readable_string("345m789p2244z A1111m 2z")?;
-        println!("{:?}", hand);
+        //println!("{:?}", hand);
         let param = PointParam {
             field_wind: 0,
             self_wind: 2,

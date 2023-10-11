@@ -1,4 +1,4 @@
-use super::{FinishHand, PointParam, Reach};
+use super::{decode, is_ji, FinishHand, FinishType, PointParam, Reach};
 
 // Not implemented yet:
 // Nagashi-Mangan, Renho, Sanrenko, Surenko, Daisharin, Parenchan
@@ -201,7 +201,11 @@ pub fn check_yaku(hand: &FinishHand, param: &PointParam, menzen: bool) -> u64 {
     }
     {
         let tan1 = hand.mianzi_list.iter().all(|m| m.is_tanyao());
-        let tan2 = super::is_tanyao(hand.head).unwrap();
+        let tan2 = if let Some(head) = hand.head {
+            super::is_tanyao(head).unwrap()
+        } else {
+            true
+        };
         if tan1 && tan2 {
             yaku |= Yaku::TANYAO.0;
         }
@@ -310,7 +314,11 @@ pub fn check_yaku(hand: &FinishHand, param: &PointParam, menzen: bool) -> u64 {
     }
     {
         let yes1 = hand.mianzi_list.iter().all(|m| m.is_chanta());
-        let yes2 = super::is_yao(hand.head).unwrap();
+        let yes2 = if let Some(head) = hand.head {
+            super::is_yao(head).unwrap()
+        } else {
+            true
+        };
         if yes1 && yes2 {
             yaku |= if menzen {
                 Yaku::CHANTA.0
@@ -319,7 +327,9 @@ pub fn check_yaku(hand: &FinishHand, param: &PointParam, menzen: bool) -> u64 {
             };
         }
     }
-    // CHITOI: check other routine
+    if hand.finish_type == FinishType::Chitoi {
+        yaku |= Yaku::CHITOI.0;
+    }
     {
         let yes = hand.mianzi_list.iter().all(|m| m.mtype.is_same());
         if yes {
@@ -341,7 +351,11 @@ pub fn check_yaku(hand: &FinishHand, param: &PointParam, menzen: bool) -> u64 {
             .mianzi_list
             .iter()
             .all(|m| m.mtype.is_same() && m.is_chanta());
-        let yes2 = super::is_yao(hand.head).unwrap();
+        let yes2 = if let Some(head) = hand.head {
+            super::is_yao(head).unwrap()
+        } else {
+            true
+        };
         if yes1 && yes2 {
             yaku |= Yaku::HONRO.0;
         }
@@ -365,7 +379,7 @@ pub fn check_yaku(hand: &FinishHand, param: &PointParam, menzen: bool) -> u64 {
             yaku |= Yaku::SANKAN.0;
         }
     }
-    {
+    if let Some(head) = hand.head {
         let mut s1 = false;
         let mut s2 = false;
         let mut s3 = false;
@@ -377,10 +391,7 @@ pub fn check_yaku(hand: &FinishHand, param: &PointParam, menzen: bool) -> u64 {
                 _ => {}
             }
         }
-        if (s1 && s2 && hand.head == 33)
-            || (s2 && s3 && hand.head == 31)
-            || (s3 && s1 && hand.head == 32)
-        {
+        if (s1 && s2 && head == 33) || (s2 && s3 && head == 31) || (s3 && s1 && head == 32) {
             yaku |= Yaku::SHOSANGEN.0;
         }
     }
@@ -404,10 +415,12 @@ pub fn check_yaku(hand: &FinishHand, param: &PointParam, menzen: bool) -> u64 {
             }
             color = Some(kind);
         }
-        if !super::is_ji(hand.head).unwrap() {
-            let (kind, _num) = super::decode(hand.head).unwrap();
-            if color != Some(kind) {
-                yes = false;
+        if let Some(head) = hand.head {
+            if !super::is_ji(head).unwrap() {
+                let (kind, _num) = super::decode(head).unwrap();
+                if color != Some(kind) {
+                    yes = false;
+                }
             }
         }
         if yes {
@@ -416,7 +429,11 @@ pub fn check_yaku(hand: &FinishHand, param: &PointParam, menzen: bool) -> u64 {
     }
     {
         let yes1 = hand.mianzi_list.iter().all(|m| m.is_junchan());
-        let yes2 = super::is_jun(hand.head).unwrap();
+        let yes2 = if let Some(head) = hand.head {
+            super::is_jun(head).unwrap()
+        } else {
+            true
+        };
         if yes1 && yes2 {
             yaku |= if menzen {
                 Yaku::JUNCHAN.0
@@ -449,14 +466,18 @@ pub fn check_yaku(hand: &FinishHand, param: &PointParam, menzen: bool) -> u64 {
     }
 
     // 6
-    if !super::is_ji(hand.head).unwrap() {
-        let (color, _num) = super::decode(hand.head).unwrap();
-        let yes = hand.mianzi_list.iter().all(|m| {
-            let (kind, _num) = super::decode(m.pai).unwrap();
-            kind == color
-        });
-        if yes {
-            yaku |= if menzen { Yaku::CHIN.0 } else { Yaku::CHIN_N.0 };
+    {
+        let color = hand.mianzi_list[0].color();
+        if !is_ji(color).unwrap() {
+            let yes1 = hand.mianzi_list.iter().all(|m| m.color() == color);
+            let yes2 = if let Some(head) = hand.head {
+                color == decode(head).unwrap().0
+            } else {
+                true
+            };
+            if yes1 && yes2 {
+                yaku |= if menzen { Yaku::CHIN.0 } else { Yaku::CHIN_N.0 };
+            }
         }
     }
 
@@ -536,7 +557,7 @@ mod tests {
                 },
             ],
             // 88m
-            head: 7,
+            head: Some(7),
             finish_pai: 2,
             tumo: true,
         };
