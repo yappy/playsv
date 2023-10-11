@@ -37,10 +37,14 @@ fn context2d(canvas: &HtmlCanvasElement) -> CanvasRenderingContext2d {
 }
 
 pub trait App {
+    fn ready(&mut self) -> bool {
+        true
+    }
+    fn on_ready(&mut self) {}
+
     fn frame(&mut self) {}
     fn render(&mut self, _context: &CanvasRenderingContext2d, _width: u32, _height: u32) {}
 
-    fn init(&mut self) {}
     fn on_key_down(&mut self, _event: &KeyboardEvent) {}
     fn on_key_up(&mut self, _event: &KeyboardEvent) {}
     fn on_mouse_down(&mut self, _event: &MouseEvent) {}
@@ -53,6 +57,7 @@ pub trait App {
 #[derive(Debug)]
 pub struct BaseSys<T> {
     app: T,
+    on_ready_done: bool,
     front_canvas: HtmlCanvasElement,
     back_canvas: HtmlCanvasElement,
     debug_cmd: HtmlInputElement,
@@ -102,6 +107,7 @@ impl<T: App + 'static> BaseSys<T> {
 
         Self {
             app,
+            on_ready_done: false,
             front_canvas,
             back_canvas,
             debug_cmd,
@@ -121,6 +127,14 @@ impl<T: App + 'static> BaseSys<T> {
     }
 
     fn on_interval(&mut self) {
+        if !self.app.ready() {
+            return;
+        }
+        if !self.on_ready_done {
+            self.app.on_ready();
+            self.on_ready_done = true;
+        }
+
         let context = context2d(&self.back_canvas);
 
         self.app.frame();
@@ -134,6 +148,10 @@ impl<T: App + 'static> BaseSys<T> {
     }
 
     fn on_keydown(&mut self, event: &KeyboardEvent) {
+        if !self.app.ready() {
+            return;
+        }
+
         if event.repeat() {
             return;
         }
@@ -142,11 +160,19 @@ impl<T: App + 'static> BaseSys<T> {
     }
 
     fn on_keyup(&mut self, event: &KeyboardEvent) {
+        if !self.app.ready() {
+            return;
+        }
+
         log::info!("Key up: {}", event.code());
         self.app.on_key_up(event);
     }
 
     fn on_mousedown(&mut self, event: &MouseEvent) {
+        if !self.app.ready() {
+            return;
+        }
+
         log::info!(
             "Mouse down: {} ({}, {})",
             event.button(),
@@ -157,6 +183,10 @@ impl<T: App + 'static> BaseSys<T> {
     }
 
     fn on_mouseup(&mut self, event: &MouseEvent) {
+        if !self.app.ready() {
+            return;
+        }
+
         log::info!(
             "Mouse up: {} ({}, {})",
             event.button(),
@@ -167,6 +197,10 @@ impl<T: App + 'static> BaseSys<T> {
     }
 
     fn on_click(&mut self, event: &MouseEvent) {
+        if !self.app.ready() {
+            return;
+        }
+
         log::info!(
             "Mouse click: {} ({}, {})",
             event.button(),
@@ -177,6 +211,10 @@ impl<T: App + 'static> BaseSys<T> {
     }
 
     fn on_debug_keydown(&mut self, event: &KeyboardEvent) {
+        if !self.app.ready() {
+            return;
+        }
+
         let key = event.key();
         let text = self.debug_cmd.value();
 
@@ -337,7 +375,5 @@ impl<T: App + 'static> BaseSys<T> {
                 .unwrap()
                 .alert_with_message("Fatal Error: See the debug console.");
         }));
-
-        basesys.borrow_mut().app.init();
     }
 }

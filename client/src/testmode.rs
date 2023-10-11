@@ -25,23 +25,6 @@ impl TestMode {
     pub fn new(img_set: Rc<ImageSet>) -> Self {
         log::info!("Test Mode...");
 
-        let mut pai_list_hit = Vec::new();
-        {
-            let x_init = 20u32;
-            let mut x = x_init;
-            let mut y = 250u32;
-            for pai in 0..PAI_COUNT_U8 {
-                let (kind, num) = mjsys::decode(pai).unwrap();
-                let img = &img_set.pai[kind as usize][num as usize - 1];
-                pai_list_hit.push(HitBox::from_image(img, x, y));
-                x += img.width();
-                if pai == 17 {
-                    y += img.height();
-                    x = x_init;
-                }
-            }
-        }
-
         let mut hand = Vec::new();
         let mut rng = rand::thread_rng();
         'retry: loop {
@@ -61,19 +44,34 @@ impl TestMode {
         hand.sort();
         assert_eq!(mjsys::HAND_BEFORE_DRAW, hand.len());
 
-        let mut s = Self {
+        Self {
             img_set,
-            pai_list_hit,
+            pai_list_hit: Default::default(),
             hand,
             hand_hit: Default::default(),
             finish,
             finish_hit: None,
             judge_string: Default::default(),
-        };
-        s.update_hitbox();
-        s.update_judge();
+        }
+    }
 
-        s
+    pub fn on_ready(&mut self) {
+        let x_init = 20u32;
+        let mut x = x_init;
+        let mut y = 250u32;
+        for pai in 0..PAI_COUNT_U8 {
+            let (kind, num) = mjsys::decode(pai).unwrap();
+            let img = &self.img_set.pai[kind as usize][num as usize - 1];
+            self.pai_list_hit.push(HitBox::from_image(img, x, y));
+            x += img.width();
+            if pai == 17 {
+                y += img.height();
+                x = x_init;
+            }
+        }
+
+        self.update_hitbox();
+        self.update_judge();
     }
 
     fn update_hitbox(&mut self) {

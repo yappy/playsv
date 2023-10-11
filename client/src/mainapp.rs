@@ -1,5 +1,5 @@
 use crate::{
-    asset,
+    asset::Assets,
     basesys::{App, BaseSys},
     net::PollingHttp,
     testmode::{self, TestMode},
@@ -27,7 +27,7 @@ struct DbgCmd {
 }
 
 enum State {
-    Init,
+    Load,
     TestMode,
     SelectRoom(Option<Box<jsif::RoomList>>),
     Main(Option<Box<jsif::LocalView>>),
@@ -36,7 +36,7 @@ enum State {
 #[derive(Default)]
 pub struct ImageSet {
     // [kind][num]
-    pub pai: [Vec<HtmlImageElement>; 4],
+    pub pai: [Vec<Rc<HtmlImageElement>>; 4],
 }
 
 pub struct HitBox {
@@ -64,6 +64,7 @@ impl HitBox {
 struct MainApp {
     state: Rc<RefCell<State>>,
 
+    assets: Assets,
     http: PollingHttp,
     frame: u64,
     fps: f64,
@@ -82,6 +83,7 @@ impl MainApp {
     fn new() -> Self {
         let dbg_cmds = Self::create_dbg_cmds();
 
+        let assets = Assets::new();
         let http = PollingHttp::new();
 
         let mut img_set: ImageSet = Default::default();
@@ -98,13 +100,7 @@ impl MainApp {
                 } else {
                     format!("pai/p_{}_0.gif", zu_table[num])
                 };
-                let img = HtmlImageElement::new().unwrap();
-                let testdata = format!(
-                    "data:image/gif;base64,{}",
-                    asset::read_file(&fname).unwrap_or_else(|e| panic!("{e}"))
-                );
-                img.set_src(&testdata);
-
+                let img = assets.get_image(&fname).unwrap();
                 list.push(img);
             }
         }
@@ -119,6 +115,7 @@ impl MainApp {
         Self {
             state,
 
+            assets,
             http,
             frame: 0,
             fps: 0.0,
@@ -136,7 +133,7 @@ impl MainApp {
 }
 
 impl App for MainApp {
-    fn init(&mut self) {
+    fn on_ready(&mut self) {
         // Get room data and go to SelectRoom state.
         /*
         let url = format!("{}api/info", apiroot());
@@ -156,6 +153,7 @@ impl App for MainApp {
         });
         *self.state.borrow_mut() = State::SelectRoom(None);
         */
+        self.test_mode.on_ready();
     }
 
     fn frame(&mut self) {
@@ -203,7 +201,7 @@ impl App for MainApp {
 
         let state = &*self.state.borrow();
         match state {
-            State::Init => {}
+            State::Load => {}
             State::TestMode => {
                 self.test_mode.render(context, width, height);
             }
@@ -393,10 +391,10 @@ impl MainApp {
         }
 
         if args.free.is_empty() {
-            log::debug!("All files:\n{}", asset::get_file_list().join("\n"));
+            log::debug!("All files:\n{}", self.assets.get_file_list().join("\n"));
         } else {
             for name in args.free.iter() {
-                let base64 = asset::read_file(name)?;
+                let base64 = self.assets.get_binary_file(name)?;
                 log::debug!("{name} {}\n{}", base64.len(), base64)
             }
         }
