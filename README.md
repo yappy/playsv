@@ -6,16 +6,28 @@
 
 <https://www.rust-lang.org/ja/tools/install>
 
-## Build + Run (native)
+## Build + Run (full)
 
 ```sh
 cd REPO_ROOT
 # the workspace contains common/ and playsv/
 cargo build [--release]
-cargo run [--release]
+# client/ will be built automatically by playsv/build.rs
+# the client wasm binary will be included into the server
+cargo run [--release] -- --help
+cargo run [--release] -- --port 9999
+curl http://127.0.0.1:9999/
 ```
 
-## Build + Run (wasm)
+## Test
+
+```sh
+cd REPO_ROOT
+# the workspace contains common/ and playsv/
+cargo test [-- --nocapture]
+```
+
+## Build + Run (wasm only)
 
 ```sh
 rustup target add wasm32-unknown-unknown
@@ -24,13 +36,8 @@ cargo install --locked trunk
 
 ```sh
 cd client
-trunk build
-trunk serve
-```
-
-```sh
-trunk build --release
-trunk serve --release
+trunk build [--release]
+trunk serve [--release]
 ```
 
 ## Debug build.rs
