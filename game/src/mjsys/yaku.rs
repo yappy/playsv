@@ -350,7 +350,7 @@ pub fn check_yaku(hand: &FinishHand, param: &PointParam, menzen: bool) -> u64 {
         let yes1 = hand
             .mianzi_list
             .iter()
-            .all(|m| m.mtype.is_same() && m.is_chanta());
+            .all(|m| (m.mtype.is_same() || m.mtype.is_chitoi()) && m.is_chanta());
         let yes2 = if let Some(head) = hand.head {
             super::is_yao(head).unwrap()
         } else {
@@ -409,11 +409,12 @@ pub fn check_yaku(hand: &FinishHand, param: &PointParam, menzen: bool) -> u64 {
             .filter(|m| !super::is_ji(m.pai).unwrap())
         {
             let (kind, _num) = super::decode(m.pai).unwrap();
-            if color != Some(kind) {
+            if color.is_some() && color != Some(kind) {
                 yes = false;
                 break;
+            } else {
+                color = Some(kind);
             }
-            color = Some(kind);
         }
         if let Some(head) = hand.head {
             if !super::is_ji(head).unwrap() {

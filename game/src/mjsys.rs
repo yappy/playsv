@@ -1052,11 +1052,44 @@ mod tests {
         }
 
         let point = test("115599m115599p11s")?.unwrap();
-        //println!("{:?}", point);
-        //println!("{:?}", Yaku::to_japanese_list(point.yaku));
         // Reach, Tumo, Chitoi
-        assert!(point.fan == 4);
-        assert!(point.fu == 25);
+        assert_eq!(4, point.fan);
+        assert_eq!(25, point.fu);
+        assert_eq!(Yaku::REACH.0 | Yaku::TSUMO.0 | Yaku::CHITOI.0, point.yaku);
+
+        let point = test("22446688m224466p")?.unwrap();
+        assert_eq!(5, point.fan);
+        assert_eq!(25, point.fu);
+        assert_eq!(
+            Yaku::REACH.0 | Yaku::TSUMO.0 | Yaku::CHITOI.0 | Yaku::TANYAO.0,
+            point.yaku
+        );
+
+        let point = test("1199m1199p1199s11z")?.unwrap();
+        assert_eq!(6, point.fan);
+        assert_eq!(25, point.fu);
+        assert_eq!(
+            Yaku::REACH.0 | Yaku::TSUMO.0 | Yaku::CHITOI.0 | Yaku::HONRO.0,
+            point.yaku
+        );
+
+        let point = test("1133557799m1122z")?.unwrap();
+        dbg!(Yaku::to_japanese_list(point.yaku));
+        assert_eq!(7, point.fan);
+        assert_eq!(25, point.fu);
+        assert_eq!(
+            Yaku::REACH.0 | Yaku::TSUMO.0 | Yaku::CHITOI.0 | Yaku::HON.0,
+            point.yaku
+        );
+
+        let point = test("11224455778899m")?.unwrap();
+        dbg!(Yaku::to_japanese_list(point.yaku));
+        assert_eq!(10, point.fan);
+        assert_eq!(25, point.fu);
+        assert_eq!(
+            Yaku::REACH.0 | Yaku::TSUMO.0 | Yaku::CHITOI.0 | Yaku::CHIN.0,
+            point.yaku
+        );
 
         Ok(())
     }
