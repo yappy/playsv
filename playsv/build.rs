@@ -5,11 +5,11 @@ use std::{
     process::Command,
 };
 
-fn trunk_build_release(out_dir: &Path) -> Result<()> {
+fn trunk_build_release(out_dir: &Path, debug: bool) -> Result<()> {
     const PROJ_ROOT: &str = "../client";
     const PROJ_DEP: [&str; 1] = ["../game"];
-    const DIST: &str = "dist_release";
     const PUBLIC_URL: &str = "/playsv";
+    let dist: &str = if debug { "dist_debug" } else { "dist_release" };
 
     println!("cargo:rerun-if-changed={PROJ_ROOT}/build.rs");
     println!("cargo:rerun-if-changed={PROJ_ROOT}/src");
@@ -17,20 +17,24 @@ fn trunk_build_release(out_dir: &Path) -> Result<()> {
         println!("cargo:rerun-if-changed={dep}/src");
     }
 
+    // for trunk param and client compile parameter
     println!("cargo:rustc-env=PUBLIC_URL={PUBLIC_URL}");
 
-    let output = Command::new("trunk")
-        .arg("build")
-        .arg("--release")
-        .arg("--dist")
-        .arg(DIST)
+    let mut cmd = Command::new("trunk");
+    cmd.arg("build");
+    if debug {
+        // nothing
+    } else {
+        cmd.arg("--release");
+    };
+    cmd.arg("--dist")
+        .arg(dist)
         .arg("--filehash")
         .arg("false")
-        .current_dir(PROJ_ROOT)
-        // for trunk param and client compile parameter
-        .env("TRUNK_BUILD_PUBLIC_URL", &format!("{}/", PUBLIC_URL))
-        .output()
-        .expect("failed to execute trunk");
+        .arg("--public-url")
+        .arg(&format!("{}/", PUBLIC_URL))
+        .current_dir(PROJ_ROOT);
+    let output = cmd.output().expect("failed to execute trunk");
 
     if output.status.success() {
         // pass -vv to cargo to see
@@ -42,8 +46,9 @@ fn trunk_build_release(out_dir: &Path) -> Result<()> {
         );
     }
 
+    // copy {dist}/* to OUT_DIR
     let mut from = PathBuf::from(PROJ_ROOT);
-    from.push(DIST);
+    from.push(dist);
     let from = from.as_path();
 
     let files = ["index.html", "client.js", "client_bg.wasm"];
@@ -57,10 +62,12 @@ fn trunk_build_release(out_dir: &Path) -> Result<()> {
 fn main() -> Result<()> {
     let out_dir = env::var_os("OUT_DIR").unwrap();
     let out_dir = Path::new(&out_dir);
+    let debug = env::var_os("DEBUG").unwrap();
+    let debug: bool = debug.to_str().unwrap().parse()?;
 
     println!("cargo:rerun-if-changed=build.rs");
 
-    trunk_build_release(out_dir)?;
+    trunk_build_release(out_dir, debug)?;
 
     Ok(())
 }
