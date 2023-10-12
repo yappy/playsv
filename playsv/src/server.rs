@@ -11,7 +11,13 @@ use std::sync::RwLock;
 // from build system
 const GIT_VERSION: &str = git_version!();
 
+// from build.rs to this and trunk param
 const PUBLIC_URL: &str = env!("PUBLIC_URL");
+
+// by build.rs
+const INDEX: &str = include_str!(concat!(env!("OUT_DIR"), "/index.html"));
+const JS: &str = include_str!(concat!(env!("OUT_DIR"), "/client.js"));
+const WASM: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/client_bg.wasm"));
 
 // description, message, etc.
 const STRING_MAX: usize = 1024;
@@ -48,11 +54,8 @@ async fn index(path: web::Path<String>) -> impl Responder {
 }
 
 async fn file_serve(name: &str) -> impl Responder {
-    const INDEX: &str = include_str!(concat!(env!("OUT_DIR"), "/index.html"));
-    const JS: &str = include_str!(concat!(env!("OUT_DIR"), "/client.js"));
-    const WASM: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/client_bg.wasm"));
-
     println!("GET /{name}");
+
     match name {
         "index.html" => HttpResponse::Ok().content_type("text/html").body(INDEX),
         "client.js" => HttpResponse::Ok().content_type("text/javascript").body(JS),
@@ -153,6 +156,8 @@ pub async fn server_main(port: u16, cors_enable: bool) -> Result<()> {
         rooms: Default::default(),
     });
 
+    println!("{GIT_VERSION}");
+    println!("WASM: {} KiB", WASM.len() / 1024);
     println!("http://127.0.0.1:{port}{PUBLIC_URL}/");
     println!("CORS: {}", if cors_enable { "Enabled" } else { "Disabled" });
 
