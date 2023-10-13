@@ -157,7 +157,7 @@ impl MainApp {
 
 impl App for MainApp {
     fn on_ready(&mut self) {
-        if cfg!(feature="network") {
+        if cfg!(feature = "network") {
             self.go_to_room_select();
         }
     }
