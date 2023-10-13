@@ -42,7 +42,7 @@ jobs:
 
       - name: Remove Old Data and Move
         run: |
-          git rm --ignore-unmatch -r ./docs/*
+          git rm --ignore-unmatch ./docs/?*.*
           mv ./client/dist/* ./docs/
 
       - name: Git Add
