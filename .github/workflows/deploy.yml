@@ -1,4 +1,4 @@
-# On push to main, checkout doc branch and works in it.
+# On push to main, checkout deploy branch and works in it.
 
 name: Deploy Wasm App
 
