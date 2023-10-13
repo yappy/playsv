@@ -25,6 +25,7 @@ impl TestMode {
     pub fn new(img_set: Rc<ImageSet>) -> Self {
         log::info!("Test Mode...");
 
+        // generate random hand
         let mut hand = Vec::new();
         let mut rng = rand::thread_rng();
         'retry: loop {
@@ -44,7 +45,7 @@ impl TestMode {
         hand.sort();
         assert_eq!(mjsys::HAND_BEFORE_DRAW, hand.len());
 
-        Self {
+        let mut s = Self {
             img_set,
             pai_list_hit: Default::default(),
             hand,
@@ -52,10 +53,15 @@ impl TestMode {
             finish,
             finish_hit: None,
             judge_string: Default::default(),
-        }
+        };
+        s.init_input_hitbox();
+        s.update_hitbox();
+        s.update_judge();
+
+        s
     }
 
-    pub fn on_ready(&mut self) {
+    fn init_input_hitbox(&mut self) {
         let x_init = 20u32;
         let mut x = x_init;
         let mut y = 250u32;
@@ -69,9 +75,6 @@ impl TestMode {
                 x = x_init;
             }
         }
-
-        self.update_hitbox();
-        self.update_judge();
     }
 
     fn update_hitbox(&mut self) {
@@ -132,8 +135,13 @@ impl TestMode {
         points.sort_by(|a, b| b.cmp(a));
 
         let point = &points[0];
-        let p_tumo = point.calc_point_p_tumo();
-        texts.push(format!("{}符 {}翻 {}all", point.fu, point.fan, p_tumo));
+        if tumo {
+            let p_tumo = point.calc_point_p_tumo();
+            texts.push(format!("{}符 {}翻 {}all", point.fu, point.fan, p_tumo));
+        } else {
+            let p_tumo = point.calc_point_p_ron();
+            texts.push(format!("{}符 {}翻 {}", point.fu, point.fan, p_tumo));
+        }
 
         let yakus = Yaku::to_japanese_list(point.yaku);
         texts.extend(yakus.iter().map(|s| s.to_string()));

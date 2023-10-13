@@ -80,10 +80,11 @@ struct MainApp {
 }
 
 impl MainApp {
-    fn new() -> Self {
+    fn new(mut assets: Assets) -> Self {
+        assert!(assets.all_images_loaded());
+
         let dbg_cmds = Self::create_dbg_cmds();
 
-        let assets = Assets::new();
         let http = PollingHttp::new();
 
         let mut img_set: ImageSet = Default::default();
@@ -130,11 +131,8 @@ impl MainApp {
             dbg_cmds,
         }
     }
-}
 
-impl App for MainApp {
-    fn on_ready(&mut self) {
-        // Get room data and go to SelectRoom state.
+    fn init() {
         /*
         let url = format!("{}api/info", apiroot());
         let dest = Rc::clone(&self.server_info);
@@ -153,9 +151,10 @@ impl App for MainApp {
         });
         *self.state.borrow_mut() = State::SelectRoom(None);
         */
-        self.test_mode.on_ready();
     }
+}
 
+impl App for MainApp {
     fn frame(&mut self) {
         // fps
         let now = web_sys::window().unwrap().performance().unwrap().now();
@@ -482,7 +481,6 @@ impl MainApp {
 }
 
 pub fn app_main() {
-    let app = MainApp::new();
-    let sys = BaseSys::new(app, CANVAS_W, CANVAS_H);
+    let sys = BaseSys::new(|assets| MainApp::new(assets), CANVAS_W, CANVAS_H);
     sys.start();
 }

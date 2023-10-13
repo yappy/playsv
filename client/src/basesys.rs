@@ -5,6 +5,8 @@ use web_sys::{
     KeyboardEvent, MouseEvent, Window,
 };
 
+use crate::asset::Assets;
+
 // This should be safe because js event handlers will be
 // executed serially on a single thread.
 pub static mut PANIC_FLAG: bool = false;
@@ -37,11 +39,6 @@ fn context2d(canvas: &HtmlCanvasElement) -> CanvasRenderingContext2d {
 }
 
 pub trait App {
-    fn ready(&mut self) -> bool {
-        true
-    }
-    fn on_ready(&mut self) {}
-
     fn frame(&mut self) {}
     fn render(&mut self, _context: &CanvasRenderingContext2d, _width: u32, _height: u32) {}
 
@@ -54,10 +51,10 @@ pub trait App {
     fn on_debug_command(&mut self, _cmdline: &str) {}
 }
 
-#[derive(Debug)]
-pub struct BaseSys<T> {
-    app: T,
-    on_ready_done: bool,
+pub struct BaseSys<T, F> {
+    assets: Option<Assets>,
+    app: Option<T>,
+    app_factory: F,
     front_canvas: HtmlCanvasElement,
     back_canvas: HtmlCanvasElement,
     debug_cmd: HtmlInputElement,
@@ -68,8 +65,15 @@ pub struct BaseSys<T> {
     cmd_index: usize,
 }
 
-impl<T: App + 'static> BaseSys<T> {
-    pub fn new(app: T, canvas_w: u32, canvas_h: u32) -> Self {
+impl<T, F> BaseSys<T, F>
+where
+    T: App + 'static,
+    F: Fn(Assets) -> T + 'static,
+{
+    pub fn new(app_factory: F, canvas_w: u32, canvas_h: u32) -> Self {
+        // load start
+        let assets = Assets::new();
+
         let (_window, document, body) = basics();
 
         let create_canvas = || {
@@ -106,8 +110,9 @@ impl<T: App + 'static> BaseSys<T> {
         body.append_child(&debug_area).unwrap();
 
         Self {
-            app,
-            on_ready_done: false,
+            assets: Some(assets),
+            app: None,
+            app_factory,
             front_canvas,
             back_canvas,
             debug_cmd,
@@ -127,124 +132,116 @@ impl<T: App + 'static> BaseSys<T> {
     }
 
     fn on_interval(&mut self) {
-        if !self.app.ready() {
+        if let Some(ref mut assets) = &mut self.assets {
+            if assets.all_images_loaded() {
+                let app = (self.app_factory)(self.assets.take().unwrap());
+                self.app = Some(app);
+            }
             return;
         }
-        if !self.on_ready_done {
-            self.app.on_ready();
-            self.on_ready_done = true;
+
+        if let Some(ref mut app) = &mut self.app {
+            let context = context2d(&self.back_canvas);
+
+            app.frame();
+
+            context.save();
+            app.render(&context, self.canvas_w, self.canvas_h);
+            context.restore();
+
+            // TODO animationFrame would be better
+            self.flip();
         }
-
-        let context = context2d(&self.back_canvas);
-
-        self.app.frame();
-
-        context.save();
-        self.app.render(&context, self.canvas_w, self.canvas_h);
-        context.restore();
-
-        // TODO animationFrame would be better
-        self.flip();
     }
 
     fn on_keydown(&mut self, event: &KeyboardEvent) {
-        if !self.app.ready() {
-            return;
-        }
-
+        // ignore keeping pressed
         if event.repeat() {
             return;
         }
-        log::info!("Key down: {}", event.code());
-        self.app.on_key_down(event);
+
+        if let Some(ref mut app) = &mut self.app {
+            log::info!("Key down: {}", event.code());
+            app.on_key_down(event);
+        }
     }
 
     fn on_keyup(&mut self, event: &KeyboardEvent) {
-        if !self.app.ready() {
-            return;
+        if let Some(ref mut app) = &mut self.app {
+            log::info!("Key up: {}", event.code());
+            app.on_key_up(event);
         }
-
-        log::info!("Key up: {}", event.code());
-        self.app.on_key_up(event);
     }
 
     fn on_mousedown(&mut self, event: &MouseEvent) {
-        if !self.app.ready() {
-            return;
+        if let Some(ref mut app) = &mut self.app {
+            log::info!(
+                "Mouse down: {} ({}, {})",
+                event.button(),
+                event.client_x(),
+                event.client_y()
+            );
+            app.on_mouse_down(event);
         }
-
-        log::info!(
-            "Mouse down: {} ({}, {})",
-            event.button(),
-            event.client_x(),
-            event.client_y()
-        );
-        self.app.on_mouse_down(event);
     }
 
     fn on_mouseup(&mut self, event: &MouseEvent) {
-        if !self.app.ready() {
-            return;
+        if let Some(ref mut app) = &mut self.app {
+            log::info!(
+                "Mouse up: {} ({}, {})",
+                event.button(),
+                event.client_x(),
+                event.client_y()
+            );
+            app.on_mouse_up(event);
         }
-
-        log::info!(
-            "Mouse up: {} ({}, {})",
-            event.button(),
-            event.client_x(),
-            event.client_y()
-        );
-        self.app.on_mouse_up(event);
     }
 
     fn on_click(&mut self, event: &MouseEvent) {
-        if !self.app.ready() {
-            return;
+        if let Some(ref mut app) = &mut self.app {
+            log::info!(
+                "Mouse click: {} ({}, {})",
+                event.button(),
+                event.client_x(),
+                event.client_y()
+            );
+            app.on_mouse_click(event);
         }
-
-        log::info!(
-            "Mouse click: {} ({}, {})",
-            event.button(),
-            event.client_x(),
-            event.client_y()
-        );
-        self.app.on_mouse_click(event);
     }
 
     fn on_debug_keydown(&mut self, event: &KeyboardEvent) {
-        if !self.app.ready() {
-            return;
-        }
+        if let Some(ref mut app) = &mut self.app {
+            let key = event.key();
+            let text = self.debug_cmd.value();
 
-        let key = event.key();
-        let text = self.debug_cmd.value();
+            match key.as_str() {
+                "Enter" => {
+                    self.cmd_buffer.remove(self.cmd_index);
+                    self.cmd_buffer.push_front(text.clone());
+                    self.cmd_buffer.push_front("".to_string());
+                    self.cmd_index = 0;
+                    self.debug_cmd.set_value("");
 
-        match key.as_str() {
-            "Enter" => {
-                self.cmd_buffer.remove(self.cmd_index);
-                self.cmd_buffer.push_front(text.clone());
-                self.cmd_buffer.push_front("".to_string());
-                self.cmd_index = 0;
-                self.debug_cmd.set_value("");
-
-                self.app.on_debug_command(&text);
+                    app.on_debug_command(&text);
+                }
+                "Down" | "ArrowDown" => {
+                    self.cmd_buffer[self.cmd_index] = text;
+                    let new_index = self.cmd_index.saturating_sub(1);
+                    let new_index = new_index.clamp(0, self.cmd_buffer.len() - 1);
+                    self.cmd_index = new_index;
+                    let new_text = self.cmd_buffer[new_index].as_str();
+                    self.debug_cmd.set_value(new_text);
+                }
+                "Up" | "ArrowUp" => {
+                    self.cmd_buffer[self.cmd_index] = text;
+                    let new_index = self.cmd_index.saturating_add(1);
+                    let new_index = new_index.clamp(0, self.cmd_buffer.len() - 1);
+                    self.cmd_index = new_index;
+                    let new_text = self.cmd_buffer[new_index].as_str();
+                    self.debug_cmd.set_value(new_text);
+                }
+                _ => {}
             }
-            "Down" | "ArrowDown" => {
-                self.cmd_buffer[self.cmd_index] = text;
-                let new_index = self.cmd_index.saturating_sub(1);
-                let new_index = new_index.clamp(0, self.cmd_buffer.len() - 1);
-                self.cmd_index = new_index;
-                let new_text = self.cmd_buffer[new_index].as_str();
-                self.debug_cmd.set_value(new_text);
-            }
-            "Up" | "ArrowUp" => {
-                self.cmd_buffer[self.cmd_index] = text;
-                let new_index = self.cmd_index.saturating_add(1);
-                let new_index = new_index.clamp(0, self.cmd_buffer.len() - 1);
-                self.cmd_index = new_index;
-                let new_text = self.cmd_buffer[new_index].as_str();
-                self.debug_cmd.set_value(new_text);
-            }
-            _ => {}
         }
     }
 
