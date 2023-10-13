@@ -6,6 +6,13 @@
 
 <https://www.rust-lang.org/ja/tools/install>
 
+## Install Wasm Tools
+
+```sh
+rustup target add wasm32-unknown-unknown
+cargo install --locked trunk
+```
+
 ## Build + Run (full)
 
 ```sh
@@ -13,6 +20,7 @@ cd REPO_ROOT
 # the workspace contains common/ and playsv/
 cargo build [--release]
 # client/ will be built automatically by playsv/build.rs
+# "network" feature will be enabled for client build
 # the client wasm binary will be included into the server
 cargo run [--release] -- --help
 cargo run [--release] -- --port 9999
@@ -30,14 +38,15 @@ cargo test [-- --nocapture]
 ## Build + Run (wasm only)
 
 ```sh
-rustup target add wasm32-unknown-unknown
-cargo install --locked trunk
-```
-
-```sh
 cd client
 trunk build [--release]
 trunk serve [--release]
+```
+
+## Compile Check Only
+
+```sh
+cargo check
 ```
 
 ## Debug build.rs
@@ -46,7 +55,7 @@ trunk serve [--release]
 cargo build -vv
 ```
 
-## Update Tools
+## Update Toolchain
 
 ```sh
 rustup self update
@@ -73,3 +82,15 @@ cargo update
 # cargo-edit
 cargo upgrade
 ```
+
+## Software Architecture
+
+* `/Cargo.toml` is workspace. It includes `playsv` and `game`.
+* `playsv` is native app. Behaves as a http server.
+  * Depends on `game`.
+  * Custom build (build.rs) calls `client` build with `network` feature.
+* `client` is Wasm app. (to be built by trunk)
+  * Depends on `game`.
+  * If `network` feature is enabled, behaves as a http client.
+  * If `network` feature is disabled, test mode will be started.
+* `game` is common logic/struct library.
