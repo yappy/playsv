@@ -10,11 +10,11 @@ use getopts::{Matches, Options};
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 use web_sys::{CanvasRenderingContext2d, HtmlImageElement};
 
-// On server build, TRUNK_BUILD_PUBLIC_URL will be specified by env
-const APIROOT: Option<&str> = option_env!("TRUNK_BUILD_PUBLIC_URL");
+// On server build, PUBLIC_URL will be specified by env
+const APIROOT: Option<&str> = option_env!("PUBLIC_URL");
 
 fn apiroot() -> &'static str {
-    APIROOT.unwrap_or("/")
+    APIROOT.unwrap_or("")
 }
 
 const CANVAS_W: u32 = 640;
@@ -27,7 +27,6 @@ struct DbgCmd {
 }
 
 enum State {
-    Load,
     TestMode,
     SelectRoom(Option<Box<jsif::RoomList>>),
     Main(Option<Box<jsif::LocalView>>),
@@ -107,11 +106,10 @@ impl MainApp {
         }
         let img_set = Rc::new(img_set);
 
-        //let initial_state = State::Init;
+        let test_mode = TestMode::new(Rc::clone(&img_set));
+
         let initial_state = State::TestMode;
         let state = Rc::new(RefCell::new(initial_state));
-
-        let test_mode = TestMode::new(Rc::clone(&img_set));
 
         Self {
             state,
@@ -132,9 +130,11 @@ impl MainApp {
         }
     }
 
-    fn init() {
-        /*
-        let url = format!("{}api/info", apiroot());
+    fn go_to_room_select(&mut self) {
+        log::info!("APIROOT={}", apiroot());
+
+        let url = format!("{}/api/info", apiroot());
+        log::info!("HTTP GET: {url}");
         let dest = Rc::clone(&self.server_info);
         self.http.get(&url, move |result| {
             let info: jsif::ServerInfo = serde_json::from_str(result.expect("HTTP request error"))
@@ -142,19 +142,26 @@ impl MainApp {
             *dest.borrow_mut() = Some(format!("{}\n{}", info.version, info.description));
         });
 
-        let url = format!("{}api/room", apiroot());
+        let url = format!("{}/api/room", apiroot());
+        log::info!("HTTP GET: {url}");
         let dest = Rc::clone(&self.state);
         self.http.get(&url, move |result| {
             let rooms: jsif::RoomList = serde_json::from_str(result.expect("HTTP request error"))
                 .expect("Json parse error");
             *dest.borrow_mut() = State::SelectRoom(Some(Box::new(rooms)));
         });
+
         *self.state.borrow_mut() = State::SelectRoom(None);
-        */
     }
 }
 
 impl App for MainApp {
+    fn on_ready(&mut self) {
+        if cfg!(feature="network") {
+            self.go_to_room_select();
+        }
+    }
+
     fn frame(&mut self) {
         // fps
         let now = web_sys::window().unwrap().performance().unwrap().now();
@@ -200,7 +207,6 @@ impl App for MainApp {
 
         let state = &*self.state.borrow();
         match state {
-            State::Load => {}
             State::TestMode => {
                 self.test_mode.render(context, width, height);
             }
@@ -428,7 +434,7 @@ impl MainApp {
         }
 
         if let Some(comment) = args.opt_str("c") {
-            let url = format!("{}api/room", apiroot());
+            let url = format!("{}/api/room", apiroot());
             let param = jsif::CreateRoom {
                 comment: comment.clone(),
             };
@@ -441,7 +447,7 @@ impl MainApp {
                 }
             });
         } else {
-            let url = format!("{}api/room", apiroot());
+            let url = format!("{}/api/room", apiroot());
             self.http.get(&url, |result| {
                 log::debug!("{:?}", result);
                 if let Ok(json) = result {
@@ -464,7 +470,7 @@ impl MainApp {
 
         let room = args.opt_str("r").unwrap_or("0".to_string());
         let player = args.opt_str("p").unwrap_or("0".to_string());
-        let url = format!("{}api/room/{room}/{player}", apiroot());
+        let url = format!("{}/api/room/{room}/{player}", apiroot());
         let state = Rc::clone(&self.state);
         self.http.get(&url, move |result| {
             log::debug!("{:?}", result);
