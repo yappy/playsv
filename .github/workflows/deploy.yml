@@ -1,0 +1,59 @@
+# On push to main, checkout doc branch and works in it.
+
+name: Deploy Wasm App
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  ref: refs/heads/deploy
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          ref: ${{ env.ref }}
+          fetch-depth: 0
+
+      - name: Git Setup
+        run: |
+          git remote set-url origin https://github-actions:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}
+          git config --local user.name "github-actions[bot]"
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Merge from main
+        run: |
+          git merge --no-ff ${GITHUB_SHA}
+
+      - name: Tools
+        run: |
+          rustup target add wasm32-unknown-unknown
+          cargo install trunk --locked
+
+      - name: Build
+        working-directory: ./client
+        run: |
+          trunk build --release
+
+      - name: Remove Old Data and Move
+        run: |
+          git rm --ignore-unmatch -r ./docs/*
+          mv ./client/dist/* ./docs/
+
+      - name: Git Add
+        run: |
+          git add ./docs
+
+      - name: Git Commit
+        continue-on-error: true
+        run: |
+          git commit -m "Update for ${GITHUB_REF} ${GITHUB_SHA}" -m "Automatic push by github actions"
+
+      - name: Git Push
+        run: |
+          git push origin HEAD:${{ env.ref }}
