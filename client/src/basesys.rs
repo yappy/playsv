@@ -39,6 +39,8 @@ fn context2d(canvas: &HtmlCanvasElement) -> CanvasRenderingContext2d {
 }
 
 pub trait App {
+    fn on_ready(&mut self) {}
+
     fn frame(&mut self) {}
     fn render(&mut self, _context: &CanvasRenderingContext2d, _width: u32, _height: u32) {}
 
@@ -134,7 +136,8 @@ where
     fn on_interval(&mut self) {
         if let Some(ref mut assets) = &mut self.assets {
             if assets.all_images_loaded() {
-                let app = (self.app_factory)(self.assets.take().unwrap());
+                let mut app = (self.app_factory)(self.assets.take().unwrap());
+                app.on_ready();
                 self.app = Some(app);
             }
             return;

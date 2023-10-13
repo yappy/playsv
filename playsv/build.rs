@@ -21,13 +21,16 @@ fn trunk_build_release(out_dir: &Path, debug: bool) -> Result<()> {
     println!("cargo:rustc-env=PUBLIC_URL={PUBLIC_URL}");
 
     let mut cmd = Command::new("trunk");
+    cmd.env("PUBLIC_URL", PUBLIC_URL);
     cmd.arg("build");
     if debug {
         // nothing
     } else {
         cmd.arg("--release");
     };
-    cmd.arg("--dist")
+    cmd.arg("--features")
+        .arg("network")
+        .arg("--dist")
         .arg(dist)
         .arg("--filehash")
         .arg("false")

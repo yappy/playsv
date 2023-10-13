@@ -1,9 +1,5 @@
 use crate::mainapp::{HitBox, ImageSet};
-use game::mjsys::{
-    self,
-    yaku::{self, Yaku},
-    Hand, PointParam, Reach, PAI_COUNT_U8,
-};
+use game::mjsys::{self, yaku::Yaku, Hand, PointParam, Reach, PAI_COUNT_U8};
 use rand::prelude::*;
 use std::rc::Rc;
 use web_sys::CanvasRenderingContext2d;
