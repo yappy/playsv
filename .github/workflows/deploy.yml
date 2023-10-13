@@ -42,7 +42,7 @@ jobs:
       - name: Build
         working-directory: ./client
         run: |
-          trunk build --release --public_url ${{ env.public_url }}
+          trunk build --release --public-url ${{ env.public_url }}
 
       - name: Remove Old Data and Move
         run: |
