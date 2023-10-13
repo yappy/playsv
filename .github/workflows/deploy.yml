@@ -9,6 +9,10 @@ on:
 
 env:
   ref: refs/heads/deploy
+  # for trunk build
+  # GitHub Pages URL will be
+  # https://<user>.github.io/playsv/
+  public_url: /playsv/
 
 jobs:
   update:
@@ -38,7 +42,7 @@ jobs:
       - name: Build
         working-directory: ./client
         run: |
-          trunk build --release
+          trunk build --release --public_url ${{ env.public_url }}
 
       - name: Remove Old Data and Move
         run: |
