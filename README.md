@@ -1,5 +1,11 @@
 # playsv
 
+[![Rust Build](https://github.com/yappy/playsv/actions/workflows/rust.yml/badge.svg)](https://github.com/yappy/playsv/actions/workflows/rust.yml)
+[![Deploy Wasm App](https://github.com/yappy/playsv/actions/workflows/deploy.yml/badge.svg)](https://github.com/yappy/playsv/actions/workflows/deploy.yml)
+
+Standalone build (no network features) \
+<https://yappy.github.io/playsv/>
+
 ## Install Rust
 
 <https://www.rust-lang.org/tools/install>
