@@ -11,18 +11,28 @@ jobs:
   build-debug:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
+      - uses: actions/checkout@v3
 
-    - name: Build
-      run: cargo build --verbose
+      - name: Tools
+        run: |
+          rustup target add wasm32-unknown-unknown
+          cargo install trunk --locked
 
-    - name: Test
-      run: cargo test --verbose
+      - name: Build
+        run: cargo build --verbose
+
+      - name: Test
+        run: cargo test --verbose
 
   build-release:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+
+      - name: Tools
+        run: |
+          rustup target add wasm32-unknown-unknown
+          cargo install trunk --locked
 
       - name: Build
         run: cargo build --release --verbose
