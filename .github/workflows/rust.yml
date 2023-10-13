@@ -18,11 +18,25 @@ jobs:
           rustup target add wasm32-unknown-unknown
           cargo install trunk --locked
 
+      - name: Format
+        run: cargo fmt -- --check
+
+      - name: Format Client
+        working-directory: ./client
+        run: cargo fmt -- --check
+
+      - name: Clippy
+        run: cargo clippy --all-targets --all-features
+
+      - name: Clippy Client
+        working-directory: ./client
+        run: cargo clippy --all-targets --all-features
+
       - name: Build
-        run: cargo build --verbose
+        run: cargo build
 
       - name: Test
-        run: cargo test --verbose
+        run: cargo test
 
   build-release:
     runs-on: ubuntu-latest
