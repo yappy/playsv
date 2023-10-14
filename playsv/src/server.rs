@@ -21,7 +21,11 @@ fn version() -> String {
     } else {
         "release"
     };
-    let src = vec![env!("VERGEN_GIT_DESCRIBE"), env!("VERGEN_GIT_COMMIT_DATE"), debug];
+    let src = vec![
+        env!("VERGEN_GIT_DESCRIBE"),
+        env!("VERGEN_GIT_COMMIT_DATE"),
+        debug,
+    ];
 
     src.join(", ")
 }
