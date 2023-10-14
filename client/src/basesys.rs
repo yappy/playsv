@@ -46,9 +46,9 @@ pub trait App {
 
     fn on_key_down(&mut self, _event: &KeyboardEvent) {}
     fn on_key_up(&mut self, _event: &KeyboardEvent) {}
-    fn on_mouse_down(&mut self, _event: &MouseEvent, x: i32, y: i32) {}
-    fn on_mouse_up(&mut self, _event: &MouseEvent, x: i32, y: i32) {}
-    fn on_mouse_click(&mut self, _event: &MouseEvent, x: i32, y: i32) {}
+    fn on_mouse_down(&mut self, _event: &MouseEvent, _x: i32, _y: i32) {}
+    fn on_mouse_up(&mut self, _event: &MouseEvent, _x: i32, _y: i32) {}
+    fn on_mouse_click(&mut self, _event: &MouseEvent, _x: i32, _y: i32) {}
 
     fn on_debug_command(&mut self, _cmdline: &str) {}
 }
