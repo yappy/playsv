@@ -21,6 +21,7 @@ fn trunk_build_release(out_dir: &Path, debug: bool) -> Result<()> {
     let dist: &str = if debug { "dist_debug" } else { "dist_release" };
 
     println!("cargo:rerun-if-changed={PROJ_ROOT}/build.rs");
+    println!("cargo:rerun-if-changed={PROJ_ROOT}/index.html");
     println!("cargo:rerun-if-changed={PROJ_ROOT}/src");
     for dep in PROJ_DEP {
         println!("cargo:rerun-if-changed={dep}/src");
