@@ -1,5 +1,5 @@
 use crate::mainapp::{HitBox, ImageSet};
-use game::mjsys::{self, yaku::Yaku, Hand, Point, PointParam, Reach, PAI_COUNT_U8};
+use game::mjsys::{self, yaku::Yaku, Hand, Mianzi, Point, PointParam, Reach, PAI_COUNT_U8};
 use rand::prelude::*;
 use std::rc::Rc;
 use web_sys::CanvasRenderingContext2d;
@@ -7,13 +7,16 @@ use web_sys::CanvasRenderingContext2d;
 pub struct TestMode {
     img_set: Rc<ImageSet>,
 
+    input_mode_hit: Vec<HitBox>,
     pai_list_hit: Vec<HitBox>,
-
     hand: Vec<u8>,
     hand_hit: Vec<HitBox>,
     finish: Option<u8>,
     finish_hit: Option<HitBox>,
+    fulou: Vec<Mianzi>,
+    fulou_hit: Vec<HitBox>,
 
+    input_mode: u32,
     judge_string: [Vec<String>; 4],
 }
 
@@ -43,11 +46,17 @@ impl TestMode {
 
         let mut s = Self {
             img_set,
+
+            input_mode_hit: Default::default(),
             pai_list_hit: Default::default(),
             hand,
             hand_hit: Default::default(),
             finish,
             finish_hit: None,
+            fulou: Default::default(),
+            fulou_hit: Default::default(),
+
+            input_mode: 0,
             judge_string: Default::default(),
         };
         s.init_input_hitbox();
@@ -58,17 +67,33 @@ impl TestMode {
     }
 
     fn init_input_hitbox(&mut self) {
-        let x_init = 20u32;
-        let mut x = x_init;
-        let mut y = 250u32;
-        for pai in 0..PAI_COUNT_U8 {
-            let (kind, num) = mjsys::decode(pai).unwrap();
-            let img = &self.img_set.pai[kind as usize][num as usize - 1];
-            self.pai_list_hit.push(HitBox::from_image(img, x, y));
-            x += img.width();
-            if pai == 17 {
-                y += img.height();
-                x = x_init;
+        {
+            const X_INIT: i32 = 50;
+            const Y_INIT: i32 = 410;
+            const WIDTH: i32 = 60;
+            const HEIGHT: i32 = 30;
+            const MARGIN: i32 = 10;
+            let mut x = X_INIT;
+            let y = Y_INIT;
+            for _ in 0..5 {
+                self.input_mode_hit.push(HitBox::new(x, y, WIDTH, HEIGHT));
+                x += WIDTH + MARGIN;
+            }
+        }
+        {
+            const X_INIT: u32 = 50;
+            const Y_INIT: u32 = 450;
+            let mut x = X_INIT;
+            let mut y = Y_INIT;
+            for pai in 0..PAI_COUNT_U8 {
+                let (kind, num) = mjsys::decode(pai).unwrap();
+                let img = &self.img_set.pai[kind as usize][num as usize - 1];
+                self.pai_list_hit.push(HitBox::from_image(img, x, y));
+                x += img.width();
+                if pai == 17 {
+                    y += img.height();
+                    x = X_INIT;
+                }
             }
         }
     }
@@ -76,9 +101,9 @@ impl TestMode {
     fn update_hitbox(&mut self) {
         self.hand_hit.clear();
 
-        const START_X: u32 = 50;
+        const START_X: u32 = 100;
         let mut x = START_X;
-        let y = 400u32;
+        let y = 600u32;
         for &pai in self.hand.iter() {
             let (kind, num) = mjsys::decode(pai).unwrap();
             let img = &self.img_set.pai[kind as usize][num as usize - 1];
@@ -200,6 +225,24 @@ impl TestMode {
     }
 
     pub fn render(&self, context: &CanvasRenderingContext2d, _width: u32, _height: u32) {
+        // input box
+        const LABEL: [&str; 5] = ["標準", "チー", "ポン", "カン", "暗カン"];
+        const FONT_H: i32 = 16;
+        context.set_font(&format!("{FONT_H}px serif"));
+        for (i, hit) in self.input_mode_hit.iter().enumerate() {
+            let color = if i as u32 == self.input_mode {
+                "yellow"
+            } else {
+                "white"
+            };
+            context.set_fill_style(&color.to_string().into());
+            context.fill_rect(hit.x as f64, hit.y as f64, hit.w as f64, hit.h as f64);
+            context.set_fill_style(&"black".to_string().into());
+            context
+                .fill_text(LABEL[i], (hit.x + 5) as f64, (hit.y + FONT_H + 5) as f64)
+                .unwrap();
+        }
+
         // input list
         for (pai, hit) in self.pai_list_hit.iter().enumerate() {
             let (kind, num) = mjsys::decode(pai as u8).unwrap();
@@ -230,21 +273,23 @@ impl TestMode {
                 .unwrap();
         }
 
-        // judge string
-        const INIT_Y: u32 = 50;
-        const FONT_H: u32 = 16;
-        const JUDGE_W: u32 = 150;
-        let mut jy = INIT_Y;
-        let mut jx = 20;
-        for v in self.judge_string.iter() {
-            for line in v.iter() {
-                context.set_fill_style(&"white".to_string().into());
-                context.set_font(&format!("{FONT_H}px serif"));
-                context.fill_text(&line, jx as f64, jy as f64).unwrap();
-                jy += FONT_H;
+        {
+            // judge string
+            const INIT_Y: u32 = 50;
+            const FONT_H: u32 = 16;
+            const JUDGE_W: u32 = 200;
+            let mut jy = INIT_Y;
+            let mut jx = 20;
+            context.set_fill_style(&"white".to_string().into());
+            context.set_font(&format!("{FONT_H}px serif"));
+            for v in self.judge_string.iter() {
+                for line in v.iter() {
+                    context.fill_text(&line, jx as f64, jy as f64).unwrap();
+                    jy += FONT_H;
+                }
+                jx += JUDGE_W;
+                jy = INIT_Y;
             }
-            jx += JUDGE_W;
-            jy = INIT_Y;
         }
     }
 
@@ -265,6 +310,14 @@ impl TestMode {
             if let Some(hit) = &self.finish_hit {
                 if hit.hit(x, y) {
                     self.finish = None;
+                }
+            }
+        }
+        {
+            // mode change
+            for (i, hit) in self.input_mode_hit.iter().enumerate() {
+                if hit.hit(x, y) {
+                    self.input_mode = i as u32;
                 }
             }
         }
