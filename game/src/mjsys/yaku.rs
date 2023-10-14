@@ -589,6 +589,6 @@ mod tests {
         assert_eq!(expected, yaku_list);
         assert_eq!(6, Yaku::fan_sum(yaku_list));
 
-        println!("{:?}", Yaku::to_japanese_list(yaku_list));
+        //dbg!(Yaku::to_japanese_list(yaku_list));
     }
 }
