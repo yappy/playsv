@@ -136,6 +136,10 @@ impl TestMode {
         }
 
         let point = point.as_ref().unwrap();
+        if point.fan == 0 {
+            texts.push("錯和 役なし".to_string());
+            return texts;
+        }
         if parent {
             if tumo {
                 let p_tumo = point.calc_point_p_tumo();
