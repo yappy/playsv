@@ -242,11 +242,11 @@ impl App for MainApp {
         }
     }
 
-    fn on_mouse_click(&mut self, event: &web_sys::MouseEvent) {
+    fn on_mouse_click(&mut self, _event: &web_sys::MouseEvent, x: i32, y: i32) {
         let state = &*self.state.borrow();
         match state {
             State::TestMode => {
-                self.test_mode.click(event.x(), event.y());
+                self.test_mode.click(x, y);
             }
             _ => {}
         }
