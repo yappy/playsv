@@ -2,6 +2,15 @@ use anyhow::Result;
 use base64::{engine::general_purpose, Engine as _};
 use glob::glob;
 use std::{env, fs, path::Path};
+use vergen::EmitBuilder;
+
+fn version() -> Result<()> {
+    EmitBuilder::builder()
+        .all_cargo()
+        .all_git()
+        .git_describe(true, false, None)
+        .emit()
+}
 
 const RS_HEADER: &str = "
 fn init_assets() -> HashMap<&'static str, &'static str> {
@@ -46,6 +55,7 @@ fn main() -> Result<()> {
 
     println!("cargo:rerun-if-changed=build.rs");
 
+    version()?;
     process_assets(out_dir)?;
 
     Ok(())

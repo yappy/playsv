@@ -46,3 +46,4 @@ getrandom = { version = "0.2.10", features = ["js"] }
 anyhow = "1.0.75"
 base64 = "0.21.4"
 glob = "0.3.1"
+vergen = { version = "8.2.5", features = ["git", "gitcl", "cargo"] }

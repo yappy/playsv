@@ -4,6 +4,15 @@ use std::{
     path::{Path, PathBuf},
     process::Command,
 };
+use vergen::EmitBuilder;
+
+fn version() -> Result<()> {
+    EmitBuilder::builder()
+        .all_cargo()
+        .all_git()
+        .git_describe(true, false, None)
+        .emit()
+}
 
 fn trunk_build_release(out_dir: &Path, debug: bool) -> Result<()> {
     const PROJ_ROOT: &str = "../client";
@@ -70,6 +79,7 @@ fn main() -> Result<()> {
 
     println!("cargo:rerun-if-changed=build.rs");
 
+    version()?;
     trunk_build_release(out_dir, debug)?;
 
     Ok(())

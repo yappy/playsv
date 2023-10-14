@@ -3,21 +3,28 @@ use actix_cors::Cors;
 use actix_web::{get, http, post, web, App, HttpResponse, HttpServer, Responder};
 use anyhow::Result;
 use game::jsif;
-use git_version::git_version;
 use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::RwLock;
 
-// from build system
-const GIT_VERSION: &str = git_version!();
-
 // from build.rs to this and trunk param
 const PUBLIC_URL: &str = env!("PUBLIC_URL");
 
-// by build.rs
+// client binaries by build.rs
 const INDEX: &str = include_str!(concat!(env!("OUT_DIR"), "/index.html"));
 const JS: &str = include_str!(concat!(env!("OUT_DIR"), "/client.js"));
 const WASM: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/client_bg.wasm"));
+
+fn version() -> String {
+    let debug = if env!("VERGEN_CARGO_DEBUG") == "true" {
+        "debug"
+    } else {
+        "release"
+    };
+    let src = vec![env!("VERGEN_GIT_DESCRIBE"), env!("VERGEN_GIT_COMMIT_DATE"), debug];
+
+    src.join(", ")
+}
 
 // description, message, etc.
 const STRING_MAX: usize = 1024;
@@ -36,7 +43,7 @@ struct AppState {
 #[get("/api/info")]
 async fn info() -> impl Responder {
     let info = jsif::ServerInfo {
-        version: GIT_VERSION.to_string(),
+        version: version(),
         description: "This is a message from the server.".to_string(),
     };
 
@@ -156,7 +163,7 @@ pub async fn server_main(port: u16, cors_enable: bool) -> Result<()> {
         rooms: Default::default(),
     });
 
-    println!("{GIT_VERSION}");
+    println!("{}", version());
     println!("WASM: {} KiB", WASM.len() / 1024);
     println!("http://127.0.0.1:{port}{PUBLIC_URL}/");
     println!("CORS: {}", if cors_enable { "Enabled" } else { "Disabled" });

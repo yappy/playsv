@@ -17,6 +17,21 @@ fn apiroot() -> &'static str {
     APIROOT.unwrap_or("")
 }
 
+fn version() -> String {
+    let debug = if env!("VERGEN_CARGO_DEBUG") == "true" {
+        "debug"
+    } else {
+        "release"
+    };
+    let src = vec![
+        env!("VERGEN_GIT_DESCRIBE"),
+        env!("VERGEN_GIT_COMMIT_DATE"),
+        debug,
+    ];
+
+    src.join(", ")
+}
+
 const CANVAS_W: u32 = 640;
 const CANVAS_H: u32 = 480;
 
@@ -69,6 +84,7 @@ struct MainApp {
     fps: f64,
     fps_start: f64,
     fps_count: u64,
+    client_info: String,
     server_info: Rc<RefCell<Option<String>>>,
 
     img_set: Rc<ImageSet>,
@@ -85,6 +101,8 @@ impl MainApp {
         let dbg_cmds = Self::create_dbg_cmds();
 
         let http = PollingHttp::new();
+
+        let client_info = version();
 
         let mut img_set: ImageSet = Default::default();
         let kind_table = ["ms", "ps", "ss"];
@@ -120,6 +138,7 @@ impl MainApp {
             fps: 0.0,
             fps_start: 0.0,
             fps_count: 0,
+            client_info,
             server_info: Rc::new(RefCell::new(None)),
 
             img_set,
@@ -187,16 +206,20 @@ impl App for MainApp {
         context.set_fill_style(&color.into());
         context.fill_rect(0.0, 0.0, width as f64, height as f64);
 
-        // server info
+        // client info
         context.set_fill_style(&"white".to_string().into());
         context.set_font("10px monospace");
+        let infostr = format!("Client: {}", self.client_info);
+        context.fill_text(&infostr, 10.0, 10.0).unwrap();
+
+        // server info
         let info = &*self.server_info.borrow();
         let infostr = if let Some(info) = info {
-            info
+            format!("Server: {info}")
         } else {
-            "Getting server info..."
+            "Getting server info...".to_string()
         };
-        context.fill_text(infostr, 10.0, 10.0).unwrap();
+        context.fill_text(&infostr, 10.0, 20.0).unwrap();
 
         // fps
         context
