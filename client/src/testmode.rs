@@ -134,10 +134,11 @@ impl TestMode {
         for &m in self.fulou.iter() {
             let (kind, num) = mjsys::decode(m.pai).unwrap();
             let img = &self.img_set.pai[kind as usize][num as usize - 1];
-            let tmp = HitBox::from_image(img, x, y);
-            self.fulou_hit
-                .push(HitBox::new(tmp.x, tmp.y, tmp.w * 3, tmp.h));
-            x += (tmp.w * 3) as u32;
+            let mut hit = HitBox::from_image(img, x, y);
+            hit.w *= 3;
+            let w = hit.w;
+            self.fulou_hit.push(hit);
+            x += w as u32;
             x += 10;
         }
     }
@@ -408,10 +409,6 @@ impl TestMode {
         while self.hand.len() > limit {
             self.finish = self.hand.pop();
         }
-
-        log::info!("{:?}", self.hand);
-        log::info!("{:?}", self.finish);
-        log::info!("{:?}", self.fulou);
     }
 
     pub fn click(&mut self, x: i32, y: i32) {
@@ -432,6 +429,19 @@ impl TestMode {
                 if hit.hit(x, y) {
                     self.finish = None;
                 }
+            }
+
+            log::info!("{:?}", self.fulou_hit);
+            let mut del_idx = None;
+            for (i, hit) in self.fulou_hit.iter().enumerate() {
+                if hit.hit(x, y) {
+                    del_idx = Some(i);
+                    break;
+                }
+            }
+            if let Some(idx) = del_idx {
+                log::info!("delete {idx}");
+                self.fulou.remove(idx);
             }
         }
         {

@@ -53,6 +53,7 @@ pub struct ImageSet {
     pub pai: [Vec<Rc<HtmlImageElement>>; 4],
 }
 
+#[derive(Default, Debug, Clone, Copy)]
 pub struct HitBox {
     pub x: i32,
     pub y: i32,
