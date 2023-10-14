@@ -97,7 +97,7 @@ where
 
         let debug_area = document.create_element("div").unwrap();
         let debug_label = document.create_element("label").unwrap();
-        debug_label.set_text_content(Some("Command: "));
+        debug_label.set_text_content(Some("Command (F12): "));
         let debug_cmd = document
             .create_element("input")
             .unwrap()
@@ -105,6 +105,7 @@ where
             .unwrap();
         debug_cmd.set_type("input");
         debug_cmd.set_size(50);
+        debug_cmd.set_value("help");
 
         debug_area.append_child(&debug_label).unwrap();
         debug_area.append_child(&debug_cmd).unwrap();
