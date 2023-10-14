@@ -1,5 +1,5 @@
 use crate::mainapp::{HitBox, ImageSet};
-use game::mjsys::{self, yaku::Yaku, Hand, PointParam, Reach, PAI_COUNT_U8};
+use game::mjsys::{self, yaku::Yaku, Hand, Point, PointParam, Reach, PAI_COUNT_U8};
 use rand::prelude::*;
 use std::rc::Rc;
 use web_sys::CanvasRenderingContext2d;
@@ -14,7 +14,7 @@ pub struct TestMode {
     finish: Option<u8>,
     finish_hit: Option<HitBox>,
 
-    judge_string: Vec<String>,
+    judge_string: [Vec<String>; 4],
 }
 
 impl TestMode {
@@ -96,9 +96,7 @@ impl TestMode {
         }
     }
 
-    fn judge(&self, tumo: bool, field_wind: u8, self_wind: u8) -> Vec<String> {
-        let mut texts = Vec::new();
-
+    fn judge(&self, tumo: bool, field_wind: u8, self_wind: u8) -> Option<Point> {
         log::info!("{:?}, {}", self.hand, self.finish.unwrap());
 
         let mut hand = Hand {
@@ -114,14 +112,10 @@ impl TestMode {
             ..Default::default()
         };
         let mut result = Vec::new();
-        if let Err(e) = mjsys::all_finish_patterns(&mut hand, &mut result) {
-            texts.push("Error: contact the author.".to_string());
-            texts.push(format!("{:?}", e));
-            return texts;
-        }
+        mjsys::all_finish_patterns(&mut hand, &mut result).unwrap();
+
         if result.is_empty() {
-            texts.push("錯和".to_string());
-            return texts;
+            return None;
         }
 
         let mut points: Vec<_> = result
@@ -130,13 +124,37 @@ impl TestMode {
             .collect();
         points.sort_by(|a, b| b.cmp(a));
 
-        let point = &points[0];
-        if tumo {
-            let p_tumo = point.calc_point_p_tumo();
-            texts.push(format!("{}符 {}翻 {}all", point.fu, point.fan, p_tumo));
+        Some(points[0].clone())
+    }
+
+    fn create_judge_texts(point: &Option<Point>, parent: bool, tumo: bool) -> Vec<String> {
+        let mut texts = Vec::new();
+
+        if point.is_none() {
+            texts.push("錯和".to_string());
+            return texts;
+        }
+
+        let point = point.as_ref().unwrap();
+        if parent {
+            if tumo {
+                let p_tumo = point.calc_point_p_tumo();
+                texts.push(format!("{}符 {}翻 {}all", point.fu, point.fan, p_tumo));
+            } else {
+                let p_ron = point.calc_point_p_ron();
+                texts.push(format!("{}符 {}翻 {}", point.fu, point.fan, p_ron));
+            }
         } else {
-            let p_tumo = point.calc_point_p_ron();
-            texts.push(format!("{}符 {}翻 {}", point.fu, point.fan, p_tumo));
+            if tumo {
+                let c_tumo = point.calc_point_c_tumo();
+                texts.push(format!(
+                    "{}符 {}翻 {} {}",
+                    point.fu, point.fan, c_tumo.0, c_tumo.1
+                ));
+            } else {
+                let c_ron = point.calc_point_c_ron();
+                texts.push(format!("{}符 {}翻 {}", point.fu, point.fan, c_ron));
+            }
         }
 
         let yakus = Yaku::to_japanese_list(point.yaku);
@@ -146,19 +164,34 @@ impl TestMode {
     }
 
     fn update_judge(&mut self) {
-        self.judge_string.clear();
-
         assert!(self.hand.len() <= mjsys::HAND_BEFORE_DRAW);
         if self.hand.len() == mjsys::HAND_BEFORE_DRAW {
             if self.finish.is_some() {
-                let texts = self.judge(true, 0, 0);
-                self.judge_string.extend(texts);
-                self.judge_string.push("".to_string());
-                let texts = self.judge(false, 0, 0);
-                self.judge_string.extend(texts);
+                let pt = self.judge(true, 0, 0);
+                let pr = self.judge(false, 0, 0);
+                for (i, v) in self.judge_string.iter_mut().enumerate() {
+                    v.clear();
+
+                    let texts = match i {
+                        0 => Self::create_judge_texts(&pt, true, true),
+                        1 => Self::create_judge_texts(&pr, true, false),
+                        2 => Self::create_judge_texts(&pt, false, true),
+                        3 => Self::create_judge_texts(&pr, false, false),
+                        _ => panic!(),
+                    };
+
+                    v.extend(texts);
+                }
+            } else {
+                for v in self.judge_string.iter_mut() {
+                    v.clear();
+                }
             }
         } else {
-            self.judge_string.push("少牌".to_string());
+            for v in self.judge_string.iter_mut() {
+                v.clear();
+                v.push("少牌".to_string());
+            }
         }
     }
 
@@ -194,13 +227,20 @@ impl TestMode {
         }
 
         // judge string
+        const INIT_Y: u32 = 50;
         const FONT_H: u32 = 16;
-        let mut jy = 50;
-        for line in self.judge_string.iter() {
-            context.set_fill_style(&"white".to_string().into());
-            context.set_font(&format!("{FONT_H}px serif"));
-            context.fill_text(&line, 20.0, jy as f64).unwrap();
-            jy += FONT_H;
+        const JUDGE_W: u32 = 150;
+        let mut jy = INIT_Y;
+        let mut jx = 20;
+        for v in self.judge_string.iter() {
+            for line in v.iter() {
+                context.set_fill_style(&"white".to_string().into());
+                context.set_font(&format!("{FONT_H}px serif"));
+                context.fill_text(&line, jx as f64, jy as f64).unwrap();
+                jy += FONT_H;
+            }
+            jx += JUDGE_W;
+            jy = INIT_Y;
         }
     }
 
