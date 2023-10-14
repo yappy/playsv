@@ -46,9 +46,9 @@ pub trait App {
 
     fn on_key_down(&mut self, _event: &KeyboardEvent) {}
     fn on_key_up(&mut self, _event: &KeyboardEvent) {}
-    fn on_mouse_down(&mut self, _event: &MouseEvent) {}
-    fn on_mouse_up(&mut self, _event: &MouseEvent) {}
-    fn on_mouse_click(&mut self, _event: &MouseEvent) {}
+    fn on_mouse_down(&mut self, _event: &MouseEvent, x: i32, y: i32) {}
+    fn on_mouse_up(&mut self, _event: &MouseEvent, x: i32, y: i32) {}
+    fn on_mouse_click(&mut self, _event: &MouseEvent, x: i32, y: i32) {}
 
     fn on_debug_command(&mut self, _cmdline: &str) {}
 }
@@ -176,39 +176,35 @@ where
         }
     }
 
+    fn translate_mouse_pos(elem: &HtmlCanvasElement, event: &MouseEvent) -> (i32, i32) {
+        let rect = elem.get_bounding_client_rect();
+        let x = event.client_x();
+        let y = event.client_y();
+
+        (x - rect.x() as i32, y - rect.y() as i32)
+    }
+
     fn on_mousedown(&mut self, event: &MouseEvent) {
         if let Some(ref mut app) = &mut self.app {
-            log::info!(
-                "Mouse down: {} ({}, {})",
-                event.button(),
-                event.client_x(),
-                event.client_y()
-            );
-            app.on_mouse_down(event);
+            let (x, y) = Self::translate_mouse_pos(&self.front_canvas, event);
+            log::info!("Mouse down: {} ({}, {})", event.button(), x, y);
+            app.on_mouse_down(event, x, y);
         }
     }
 
     fn on_mouseup(&mut self, event: &MouseEvent) {
         if let Some(ref mut app) = &mut self.app {
-            log::info!(
-                "Mouse up: {} ({}, {})",
-                event.button(),
-                event.client_x(),
-                event.client_y()
-            );
-            app.on_mouse_up(event);
+            let (x, y) = Self::translate_mouse_pos(&self.front_canvas, event);
+            log::info!("Mouse up: {} ({}, {})", event.button(), x, y);
+            app.on_mouse_up(event, x, y);
         }
     }
 
     fn on_click(&mut self, event: &MouseEvent) {
         if let Some(ref mut app) = &mut self.app {
-            log::info!(
-                "Mouse click: {} ({}, {})",
-                event.button(),
-                event.client_x(),
-                event.client_y()
-            );
-            app.on_mouse_click(event);
+            let (x, y) = Self::translate_mouse_pos(&self.front_canvas, event);
+            log::info!("Mouse click: {} ({}, {})", event.button(), x, y);
+            app.on_mouse_click(event, x, y);
         }
     }
 
