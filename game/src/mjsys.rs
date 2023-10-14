@@ -254,6 +254,25 @@ pub struct Mianzi {
 }
 
 impl Mianzi {
+    pub fn to_bucket(&self, dst: &mut [u8; PAI_COUNT]) {
+        match self.mtype {
+            MianziType::Ordered | MianziType::OrderedChi => {
+                dst[self.pai as usize] += 1;
+                dst[(self.pai + 1) as usize] += 1;
+                dst[(self.pai + 2) as usize] += 1;
+            }
+            MianziType::Same | MianziType::SamePon | MianziType::SameRon => {
+                dst[self.pai as usize] += 3;
+            }
+            MianziType::SameKanBlind | MianziType::SameKanOpen => {
+                dst[self.pai as usize] += 4;
+            }
+            MianziType::Chitoi => {
+                dst[self.pai as usize] += 2;
+            }
+        }
+    }
+
     pub fn color(&self) -> u8 {
         let (kind, _num) = decode(self.pai).unwrap();
 
@@ -473,7 +492,6 @@ impl PointParam {
 }
 
 pub fn to_bucket(dst: &mut [u8; PAI_COUNT], src: &[u8]) {
-    dst.fill(0);
     for &pai in src {
         dst[pai as usize] += 1;
     }

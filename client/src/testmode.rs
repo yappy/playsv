@@ -1,5 +1,5 @@
 use crate::mainapp::{HitBox, ImageSet};
-use game::mjsys::{self, yaku::Yaku, Hand, Mianzi, Point, PointParam, Reach, PAI_COUNT_U8};
+use game::mjsys::{self, yaku::Yaku, Hand, Mianzi, MianziType, Point, PointParam, Reach};
 use rand::prelude::*;
 use std::rc::Rc;
 use web_sys::CanvasRenderingContext2d;
@@ -21,6 +21,13 @@ pub struct TestMode {
 }
 
 impl TestMode {
+    const INPUT_NORMAL: u32 = 0;
+    const INPUT_CHI: u32 = 1;
+    const INPUT_PON: u32 = 2;
+    const INPUT_KAN: u32 = 3;
+    const INPUT_ANKAN: u32 = 4;
+    const INPUT_MAX: u32 = Self::INPUT_ANKAN;
+
     pub fn new(img_set: Rc<ImageSet>) -> Self {
         log::info!("Test Mode...");
 
@@ -75,7 +82,7 @@ impl TestMode {
             const MARGIN: i32 = 10;
             let mut x = X_INIT;
             let y = Y_INIT;
-            for _ in 0..5 {
+            for _ in 0..Self::INPUT_MAX {
                 self.input_mode_hit.push(HitBox::new(x, y, WIDTH, HEIGHT));
                 x += WIDTH + MARGIN;
             }
@@ -85,7 +92,7 @@ impl TestMode {
             const Y_INIT: u32 = 450;
             let mut x = X_INIT;
             let mut y = Y_INIT;
-            for pai in 0..PAI_COUNT_U8 {
+            for pai in 0..mjsys::PAI_COUNT_U8 {
                 let (kind, num) = mjsys::decode(pai).unwrap();
                 let img = &self.img_set.pai[kind as usize][num as usize - 1];
                 self.pai_list_hit.push(HitBox::from_image(img, x, y));
@@ -99,11 +106,12 @@ impl TestMode {
     }
 
     fn update_hitbox(&mut self) {
-        self.hand_hit.clear();
-
         const START_X: u32 = 100;
+        const START_Y: u32 = 600;
         let mut x = START_X;
-        let y = 600u32;
+        let y = START_Y;
+
+        self.hand_hit.clear();
         for &pai in self.hand.iter() {
             let (kind, num) = mjsys::decode(pai).unwrap();
             let img = &self.img_set.pai[kind as usize][num as usize - 1];
@@ -116,8 +124,21 @@ impl TestMode {
             let (kind, num) = mjsys::decode(pai).unwrap();
             let img = &self.img_set.pai[kind as usize][num as usize - 1];
             self.finish_hit = Some(HitBox::from_image(img, x, y));
+            x += img.width();
         } else {
             self.finish_hit = None;
+        }
+
+        x += 10;
+        self.fulou_hit.clear();
+        for &m in self.fulou.iter() {
+            let (kind, num) = mjsys::decode(m.pai).unwrap();
+            let img = &self.img_set.pai[kind as usize][num as usize - 1];
+            let tmp = HitBox::from_image(img, x, y);
+            self.fulou_hit
+                .push(HitBox::new(tmp.x, tmp.y, tmp.w * 3, tmp.h));
+            x += (tmp.w * 3) as u32;
+            x += 10;
         }
     }
 
@@ -125,6 +146,7 @@ impl TestMode {
         log::info!("{:?}, {}", self.hand, self.finish.unwrap());
 
         let mut hand = Hand {
+            mianzi_list: self.fulou.clone(),
             finish_pai: self.finish,
             tumo,
             ..Default::default()
@@ -194,7 +216,7 @@ impl TestMode {
 
     fn update_judge(&mut self) {
         assert!(self.hand.len() <= mjsys::HAND_BEFORE_DRAW);
-        if self.hand.len() == mjsys::HAND_BEFORE_DRAW {
+        if self.hand.len() + self.fulou.len() * 3 == mjsys::HAND_BEFORE_DRAW {
             if self.finish.is_some() {
                 let pt = self.judge(true, 0, 0);
                 let pr = self.judge(false, 0, 0);
@@ -242,7 +264,6 @@ impl TestMode {
                 .fill_text(LABEL[i], (hit.x + 5) as f64, (hit.y + FONT_H + 5) as f64)
                 .unwrap();
         }
-
         // input list
         for (pai, hit) in self.pai_list_hit.iter().enumerate() {
             let (kind, num) = mjsys::decode(pai as u8).unwrap();
@@ -252,7 +273,6 @@ impl TestMode {
                 .draw_image_with_html_image_element(img, hit.x as f64, hit.y as f64)
                 .unwrap();
         }
-
         // hand
         for (i, &pai) in self.hand.iter().enumerate() {
             let hit = &self.hand_hit[i];
@@ -271,6 +291,21 @@ impl TestMode {
             context
                 .draw_image_with_html_image_element(img, hit.x as f64, hit.y as f64)
                 .unwrap();
+        }
+        // fulou
+        for (i, &m) in self.fulou.iter().enumerate() {
+            let hit = &self.fulou_hit[i];
+            let (kind, num) = mjsys::decode(m.pai).unwrap();
+
+            let mut x = hit.x;
+            for k in 0..3 {
+                let num = if m.mtype.is_ordered() { num + k } else { num };
+                let img = &self.img_set.pai[kind as usize][num as usize - 1];
+                context
+                    .draw_image_with_html_image_element(img, x as f64, hit.y as f64)
+                    .unwrap();
+                x += hit.w / 3;
+            }
         }
 
         {
@@ -291,6 +326,92 @@ impl TestMode {
                 jy = INIT_Y;
             }
         }
+    }
+
+    fn add_pai(&mut self, pai: u8) {
+        let mut bucket: [u8; mjsys::PAI_COUNT] = [0; mjsys::PAI_COUNT];
+
+        mjsys::to_bucket(&mut bucket, &self.hand);
+        if let Some(finish) = self.finish {
+            bucket[finish as usize] += 1;
+        }
+        for m in self.fulou.iter() {
+            m.to_bucket(&mut bucket);
+        }
+
+        match self.input_mode {
+            Self::INPUT_NORMAL => {
+                bucket[pai as usize] += 1;
+            }
+            Self::INPUT_CHI => {
+                let (kind, num) = mjsys::decode(pai).unwrap();
+                if kind >= mjsys::KIND_Z || num > 7 {
+                    return;
+                }
+                bucket[pai as usize] += 1;
+                bucket[(pai + 1) as usize] += 1;
+                bucket[(pai + 2) as usize] += 1;
+            }
+            Self::INPUT_PON => {
+                bucket[pai as usize] += 3;
+            }
+            Self::INPUT_KAN => {
+                bucket[pai as usize] += 4;
+            }
+            Self::INPUT_ANKAN => {
+                bucket[pai as usize] += 4;
+            }
+            _ => panic!("Must not reach"),
+        }
+
+        // total count check for each pai
+        if bucket.iter().any(|&count| count > 4) {
+            return;
+        }
+
+        match self.input_mode {
+            Self::INPUT_NORMAL => {
+                self.hand.push(pai);
+            }
+            Self::INPUT_CHI => {
+                self.fulou.push(Mianzi {
+                    mtype: MianziType::OrderedChi,
+                    pai,
+                });
+            }
+            Self::INPUT_PON => {
+                self.fulou.push(Mianzi {
+                    mtype: MianziType::SamePon,
+                    pai,
+                });
+            }
+            Self::INPUT_KAN => {
+                self.fulou.push(Mianzi {
+                    mtype: MianziType::SameKanOpen,
+                    pai,
+                });
+            }
+            Self::INPUT_ANKAN => {
+                self.fulou.push(Mianzi {
+                    mtype: MianziType::SameKanBlind,
+                    pai,
+                });
+            }
+            _ => panic!("Must not reach"),
+        }
+
+        // fit size
+        while self.fulou.len() > 4 {
+            self.fulou.pop();
+        }
+        let limit = mjsys::HAND_BEFORE_DRAW - self.fulou.len() * 3;
+        while self.hand.len() > limit {
+            self.finish = self.hand.pop();
+        }
+
+        log::info!("{:?}", self.hand);
+        log::info!("{:?}", self.finish);
+        log::info!("{:?}", self.fulou);
     }
 
     pub fn click(&mut self, x: i32, y: i32) {
@@ -331,15 +452,8 @@ impl TestMode {
                 }
             }
             if let Some(idx) = add_idx {
-                assert!(idx < PAI_COUNT_U8);
-                let count = self.hand.iter().filter(|&&p| p == idx).count();
-                if count < 4 {
-                    if self.hand.len() < mjsys::HAND_BEFORE_DRAW {
-                        self.hand.push(idx);
-                    } else {
-                        self.finish = Some(idx);
-                    }
-                }
+                assert!(idx < mjsys::PAI_COUNT_U8);
+                self.add_pai(idx);
             }
         }
         self.hand.sort();
