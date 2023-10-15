@@ -26,7 +26,7 @@ impl TestMode {
     const INPUT_PON: u32 = 2;
     const INPUT_KAN: u32 = 3;
     const INPUT_ANKAN: u32 = 4;
-    const INPUT_MAX: u32 = Self::INPUT_ANKAN;
+    const INPUT_LEN: u32 = 5;
 
     pub fn new(img_set: Rc<ImageSet>) -> Self {
         log::info!("Test Mode...");
@@ -82,7 +82,7 @@ impl TestMode {
             const MARGIN: i32 = 10;
             let mut x = X_INIT;
             let y = Y_INIT;
-            for _ in 0..Self::INPUT_MAX {
+            for _ in 0..Self::INPUT_LEN {
                 self.input_mode_hit.push(HitBox::new(x, y, WIDTH, HEIGHT));
                 x += WIDTH + MARGIN;
             }
@@ -249,7 +249,8 @@ impl TestMode {
 
     pub fn render(&self, context: &CanvasRenderingContext2d, _width: u32, _height: u32) {
         // input box
-        const LABEL: [&str; 5] = ["標準", "チー", "ポン", "カン", "暗カン"];
+        const LABEL: [&str; TestMode::INPUT_LEN as usize] =
+            ["標準", "チー", "ポン", "カン", "暗カン"];
         const FONT_H: i32 = 16;
         context.set_font(&format!("{FONT_H}px serif"));
         for (i, hit) in self.input_mode_hit.iter().enumerate() {
@@ -294,16 +295,32 @@ impl TestMode {
                 .unwrap();
         }
         // fulou
+        context.set_font(&format!("{FONT_H}px serif"));
+        context.set_fill_style(&"black".to_string().into());
         for (i, &m) in self.fulou.iter().enumerate() {
             let hit = &self.fulou_hit[i];
             let (kind, num) = mjsys::decode(m.pai).unwrap();
 
             let mut x = hit.x;
             for k in 0..3 {
+                let label_idx = match m.mtype {
+                    MianziType::OrderedChi => 1,
+                    MianziType::SamePon => 2,
+                    MianziType::SameKanOpen => 3,
+                    MianziType::SameKanBlind => 4,
+                    _ => panic!("Must not reach"),
+                };
                 let num = if m.mtype.is_ordered() { num + k } else { num };
                 let img = &self.img_set.pai[kind as usize][num as usize - 1];
                 context
                     .draw_image_with_html_image_element(img, x as f64, hit.y as f64)
+                    .unwrap();
+                context
+                    .fill_text(
+                        LABEL[label_idx],
+                        (hit.x + 5) as f64,
+                        (hit.y + FONT_H) as f64,
+                    )
                     .unwrap();
                 x += hit.w / 3;
             }
