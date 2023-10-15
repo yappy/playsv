@@ -30,7 +30,7 @@ impl TestMode {
     const INPUT_PON: u32 = 2;
     const INPUT_KAN: u32 = 3;
     const INPUT_ANKAN: u32 = 4;
-    const INPUT_LEN: u32 = 5;
+    const INPUT_LEN: u32 = 6;
 
     pub fn new(img_set: Rc<ImageSet>) -> Self {
         log::info!("Test Mode...");
@@ -258,7 +258,7 @@ impl TestMode {
     pub fn render(&self, context: &CanvasRenderingContext2d, _width: u32, _height: u32) {
         // input box
         const LABEL: [&str; TestMode::INPUT_LEN as usize] =
-            ["標準", "チー", "ポン", "カン", "暗カン"];
+            ["標準", "チー", "ポン", "カン", "暗カン", "クリア"];
         const FONT_H: i32 = 16;
         context.set_font(&format!("{FONT_H}px serif"));
         for (i, hit) in self.input_mode_hit.iter().enumerate() {
@@ -473,7 +473,13 @@ impl TestMode {
             // mode change
             for (i, hit) in self.input_mode_hit.iter().enumerate() {
                 if hit.hit(x, y) {
-                    self.input_mode = i as u32;
+                    if i == (Self::INPUT_LEN - 1) as usize {
+                        self.hand.clear();
+                        self.finish = None;
+                        self.fulou.clear();
+                    } else {
+                        self.input_mode = i as u32;
+                    }
                 }
             }
         }
