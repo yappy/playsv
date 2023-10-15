@@ -365,6 +365,7 @@ pub struct FinishHand {
     // None only if chitoi
     // if tanki, head = finish_pai
     head: Option<u8>,
+    #[allow(dead_code)]
     finish_pai: u8,
     tumo: bool,
 }
@@ -1042,7 +1043,7 @@ mod tests {
 
         for (i1, &fan) in fan_list.iter().enumerate() {
             for (i2, &fu) in fu_list.iter().enumerate() {
-                let point = calc_base_point_direct(fan, fu, 0, 0);
+                let point = calc_base_point_direct(0, fan, fu, 0, 0);
 
                 if p_ron[i1][i2] != 0 {
                     assert_eq!(p_ron[i1][i2], point.calc_point_p_ron());

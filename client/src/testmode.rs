@@ -192,6 +192,7 @@ impl TestMode {
             texts.push("錯和 役なし".to_string());
             return texts;
         }
+        #[allow(clippy::collapsible_else_if)]
         if parent {
             if tumo {
                 let p_tumo = point.calc_point_p_tumo();
@@ -344,7 +345,7 @@ impl TestMode {
             context.set_font(&format!("{FONT_H}px serif"));
             for v in self.judge_string.iter() {
                 for line in v.iter() {
-                    context.fill_text(&line, jx as f64, jy as f64).unwrap();
+                    context.fill_text(line, jx as f64, jy as f64).unwrap();
                     jy += FONT_H;
                 }
                 jx += JUDGE_W;

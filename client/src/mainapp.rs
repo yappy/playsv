@@ -20,7 +20,7 @@ fn apiroot() -> &'static str {
 fn version() -> String {
     let is_debug: bool = env!("VERGEN_CARGO_DEBUG").parse().unwrap();
     let debug = if is_debug { "debug" } else { "release" };
-    let src = vec![
+    let src = [
         env!("VERGEN_GIT_DESCRIBE"),
         env!("VERGEN_GIT_COMMIT_DATE"),
         debug,
@@ -244,6 +244,7 @@ impl App for MainApp {
         }
     }
 
+    #[allow(clippy::single_match)]
     fn on_mouse_click(&mut self, _event: &web_sys::MouseEvent, x: i32, y: i32) {
         let state = &*self.state.borrow();
         match state {
@@ -512,6 +513,6 @@ impl MainApp {
 }
 
 pub fn app_main() {
-    let sys = BaseSys::new(|assets| MainApp::new(assets), CANVAS_W, CANVAS_H);
+    let sys = BaseSys::new(MainApp::new, CANVAS_W, CANVAS_H);
     sys.start();
 }
