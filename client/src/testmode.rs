@@ -1,5 +1,9 @@
 use crate::mainapp::{HitBox, ImageSet};
-use game::mjsys::{self, yaku::Yaku, Hand, Mianzi, MianziType, Point, PointParam, Reach};
+use game::mjsys::{
+    self,
+    yaku::{Yaku, Yakuman},
+    Hand, Mianzi, MianziType, Point, PointParam, Reach,
+};
 use rand::prelude::*;
 use std::rc::Rc;
 use web_sys::CanvasRenderingContext2d;
@@ -188,6 +192,7 @@ impl TestMode {
             texts.push("錯和 役なし".to_string());
             return texts;
         }
+        #[allow(clippy::collapsible_else_if)]
         if parent {
             if tumo {
                 let p_tumo = point.calc_point_p_tumo();
@@ -211,6 +216,9 @@ impl TestMode {
 
         let yakus = Yaku::to_japanese_list(point.yaku);
         texts.extend(yakus.iter().map(|s| s.to_string()));
+        texts.push("".to_string());
+        let yakumans = Yakuman::to_japanese_list(point.yakuman);
+        texts.extend(yakumans.iter().map(|s| s.to_string()));
 
         texts
     }
@@ -337,7 +345,7 @@ impl TestMode {
             context.set_font(&format!("{FONT_H}px serif"));
             for v in self.judge_string.iter() {
                 for line in v.iter() {
-                    context.fill_text(&line, jx as f64, jy as f64).unwrap();
+                    context.fill_text(line, jx as f64, jy as f64).unwrap();
                     jy += FONT_H;
                 }
                 jx += JUDGE_W;
