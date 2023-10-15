@@ -72,7 +72,7 @@ pub fn is_num(code: u8) -> Result<bool> {
 pub fn is_sangen(code: u8) -> Result<bool> {
     let (kind, num) = decode(code)?;
 
-    Ok(kind == KIND_Z && (5..7).contains(&num))
+    Ok(kind == KIND_Z && (5..=7).contains(&num))
 }
 
 pub fn is_yao(code: u8) -> Result<bool> {
@@ -1284,6 +1284,33 @@ mod tests {
 
         assert_eq!(point1, point2);
         assert_eq!(Yaku::TANYAO.0, point1.yaku);
+
+        Ok(())
+    }
+
+    #[test]
+    fn fu_complex() -> Result<()> {
+        // head: +2
+        // 999m: +8 if tumo, +4 elsewhere
+        // +2 if tumo
+        // If tumo, 20 + 12 = 32 => 40 fu
+        let mut hand = from_human_readable_string("99m345678p234s77z 9m")?;
+        //println!("{:?}", hand);
+        let param = PointParam {
+            field_wind: 0,
+            self_wind: 3,
+            ..Default::default()
+        };
+        let mut result = Vec::new();
+        all_finish_patterns(&mut hand, &mut result)?;
+
+        let mut points: Vec<_> = result.iter().map(|r| calc_base_point(r, &param)).collect();
+        points.sort();
+        let point = points.pop().unwrap();
+
+        assert_eq!(1, point.fan);
+        assert_eq!(40, point.fu);
+        assert_eq!((400, 700), point.calc_point_c_tumo());
 
         Ok(())
     }
