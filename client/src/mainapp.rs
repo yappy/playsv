@@ -32,8 +32,8 @@ fn version() -> String {
     src.join(", ")
 }
 
-const CANVAS_W: u32 = 640;
-const CANVAS_H: u32 = 480;
+const CANVAS_W: u32 = 1280;
+const CANVAS_H: u32 = 720;
 
 type DbgCmdFunc = dyn Fn(&mut MainApp, &Options, Matches) -> Result<()>;
 struct DbgCmd {
@@ -53,6 +53,7 @@ pub struct ImageSet {
     pub pai: [Vec<Rc<HtmlImageElement>>; 4],
 }
 
+#[derive(Default, Debug, Clone, Copy)]
 pub struct HitBox {
     pub x: i32,
     pub y: i32,
@@ -61,6 +62,10 @@ pub struct HitBox {
 }
 
 impl HitBox {
+    pub fn new(x: i32, y: i32, w: i32, h: i32) -> Self {
+        Self { x, y, w, h }
+    }
+
     pub fn from_image(img: &HtmlImageElement, x: u32, y: u32) -> Self {
         Self {
             x: x as i32,

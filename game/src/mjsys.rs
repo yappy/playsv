@@ -111,6 +111,9 @@ fn char_to_kind(c: char) -> Result<u8> {
 
 // [PCAM][1-9]*[mpsz]
 // Pon, Chi, Ankan, Minkan
+// If 14 pais, the last pai will be treated as finish_pai
+// If 13 pais, set finish_pai as None
+// Otherwise, error
 pub fn from_human_readable_string(src: &str) -> Result<Hand> {
     if !src.is_ascii() {
         bail!("Invalid character");
@@ -254,6 +257,25 @@ pub struct Mianzi {
 }
 
 impl Mianzi {
+    pub fn to_bucket(&self, dst: &mut [u8; PAI_COUNT]) {
+        match self.mtype {
+            MianziType::Ordered | MianziType::OrderedChi => {
+                dst[self.pai as usize] += 1;
+                dst[(self.pai + 1) as usize] += 1;
+                dst[(self.pai + 2) as usize] += 1;
+            }
+            MianziType::Same | MianziType::SamePon | MianziType::SameRon => {
+                dst[self.pai as usize] += 3;
+            }
+            MianziType::SameKanBlind | MianziType::SameKanOpen => {
+                dst[self.pai as usize] += 4;
+            }
+            MianziType::Chitoi => {
+                dst[self.pai as usize] += 2;
+            }
+        }
+    }
+
     pub fn color(&self) -> u8 {
         let (kind, _num) = decode(self.pai).unwrap();
 
@@ -473,7 +495,6 @@ impl PointParam {
 }
 
 pub fn to_bucket(dst: &mut [u8; PAI_COUNT], src: &[u8]) {
-    dst.fill(0);
     for &pai in src {
         dst[pai as usize] += 1;
     }
@@ -489,7 +510,14 @@ pub fn all_finish_patterns(hand: &mut Hand, result: &mut Vec<FinishHand>) -> Res
 }
 
 fn finish_chitoi(hand: &Hand, result: &mut Vec<FinishHand>) -> Result<()> {
+    // menzen only
+    if !hand.mianzi_list.is_empty() {
+        return Ok(());
+    }
+
+    // x1
     let mut wait: Option<u8> = None;
+    // x2
     let mut mianzi_list: Vec<Mianzi> = Vec::new();
 
     for (pai, count) in hand.bucket.iter().enumerate() {
@@ -519,14 +547,20 @@ fn finish_chitoi(hand: &Hand, result: &mut Vec<FinishHand>) -> Result<()> {
         }
     }
 
+    if mianzi_list.len() != 7 {
+        return Ok(());
+    }
+
     if let Some(fp) = hand.finish_pai {
-        result.push(FinishHand {
-            finish_type: FinishType::Chitoi,
-            mianzi_list,
-            head: None,
-            finish_pai: fp,
-            tumo: hand.tumo,
-        });
+        if fp == wait.unwrap() {
+            result.push(FinishHand {
+                finish_type: FinishType::Chitoi,
+                mianzi_list,
+                head: None,
+                finish_pai: fp,
+                tumo: hand.tumo,
+            });
+        }
     } else {
         result.push(FinishHand {
             finish_type: FinishType::Chitoi,
@@ -719,7 +753,7 @@ fn finish_patterns(
         #[allow(clippy::identity_op)]
         if kind < 3
             && num <= 7
-            && hand.bucket[pai] >= 1
+            && hand.bucket[pai + 0] >= 1
             && hand.bucket[pai + 1] >= 1
             && hand.bucket[pai + 2] >= 1
         {
@@ -805,7 +839,7 @@ pub fn calc_base_point(hand: &FinishHand, param: &PointParam) -> Point {
 
     let mut yaku = yaku::check_yaku(hand, param, menzen);
     let fu = calc_fu(hand, param, menzen);
-    if menzen && (hand.tumo && fu == 20) || (!hand.tumo && fu == 30) {
+    if menzen && ((hand.tumo && fu == 20) || (!hand.tumo && fu == 30)) {
         yaku |= yaku::Yaku::PINHU.0;
     }
 
@@ -1002,6 +1036,10 @@ mod tests {
         assert_eq!(1, test("23m789m123789p11s 1m")?);
         assert_eq!(1, test("23m789m123789p11s 4m")?);
 
+        assert_eq!(1, test("C123m C456m C789m C123p 5s 5s")?);
+        assert_eq!(1, test("P111m P333m P555m P777m 9m 9m")?);
+        assert_eq!(1, test("A1111m A3333m A5555m A7777m 9m 9m")?);
+
         Ok(())
     }
 
@@ -1074,7 +1112,6 @@ mod tests {
         );
 
         let point = test("1133557799m1122z")?.unwrap();
-        dbg!(Yaku::to_japanese_list(point.yaku));
         assert_eq!(7, point.fan);
         assert_eq!(25, point.fu);
         assert_eq!(
@@ -1083,13 +1120,44 @@ mod tests {
         );
 
         let point = test("11224455778899m")?.unwrap();
-        dbg!(Yaku::to_japanese_list(point.yaku));
         assert_eq!(10, point.fan);
         assert_eq!(25, point.fu);
         assert_eq!(
             Yaku::REACH.0 | Yaku::TSUMO.0 | Yaku::CHITOI.0 | Yaku::CHIN.0,
             point.yaku
         );
+
+        Ok(())
+    }
+
+    #[test]
+    fn chitoi_etc() -> Result<()> {
+        fn test(input: &str, tumo: bool) -> Result<Option<Point>> {
+            let mut hand = from_human_readable_string(input)?;
+            hand.tumo = tumo;
+            let mut result = Vec::new();
+            all_finish_patterns(&mut hand, &mut result)?;
+
+            let param = PointParam {
+                field_wind: 0,
+                self_wind: 2,
+                reach: Reach::None,
+                ..Default::default()
+            };
+
+            let mut points: Vec<_> = result.iter().map(|r| calc_base_point(r, &param)).collect();
+            points.sort();
+
+            Ok(points.pop())
+        }
+
+        let point1 = test("C234m C234m 223344p 8s 8s", true)?.unwrap();
+        let point2 = test("C234m C234m 223344p 8s 8s", false)?.unwrap();
+        //dbg!(Yaku::to_japanese_list(point1.yaku));
+        //dbg!(Yaku::to_japanese_list(point2.yaku));
+
+        assert_eq!(point1, point2);
+        assert_eq!(Yaku::TANYAO.0, point1.yaku);
 
         Ok(())
     }

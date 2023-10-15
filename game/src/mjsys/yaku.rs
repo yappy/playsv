@@ -1,4 +1,4 @@
-use super::{decode, is_ji, FinishHand, FinishType, PointParam, Reach};
+use super::{decode, FinishHand, FinishType, PointParam, Reach};
 
 // Not implemented yet:
 // Nagashi-Mangan, Renho, Sanrenko, Surenko, Daisharin, Parenchan
@@ -469,7 +469,7 @@ pub fn check_yaku(hand: &FinishHand, param: &PointParam, menzen: bool) -> u64 {
     // 6
     {
         let color = hand.mianzi_list[0].color();
-        if !is_ji(color).unwrap() {
+        if color != super::KIND_Z {
             let yes1 = hand.mianzi_list.iter().all(|m| m.color() == color);
             let yes2 = if let Some(head) = hand.head {
                 color == decode(head).unwrap().0
@@ -589,6 +589,6 @@ mod tests {
         assert_eq!(expected, yaku_list);
         assert_eq!(6, Yaku::fan_sum(yaku_list));
 
-        println!("{:?}", Yaku::to_japanese_list(yaku_list));
+        //dbg!(Yaku::to_japanese_list(yaku_list));
     }
 }
