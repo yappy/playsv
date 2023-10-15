@@ -6,6 +6,8 @@ use super::{decode, FinishHand, FinishType, PointParam, Reach};
 // https://ja.wikipedia.org/wiki/%E9%BA%BB%E9%9B%80%E3%81%AE%E5%BD%B9%E4%B8%80%E8%A6%A7
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub struct Yaku(pub u64);
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
+pub struct Yakuman(pub u32);
 
 #[rustfmt::skip]
 impl Yaku {
@@ -40,31 +42,47 @@ impl Yaku {
     pub const CHITOI        : Self = Self(1 << 27);
     pub const TOITOI        : Self = Self(1 << 28);
     pub const SANANKO       : Self = Self(1 << 29);
-    pub const HONRO         : Self = Self(1 << 30);
+    pub const HONROTO       : Self = Self(1 << 30);
     pub const DOKO          : Self = Self(1 << 31);
     pub const SANKAN        : Self = Self(1 << 32);
     pub const SHOSANGEN     : Self = Self(1 << 33);
     pub const DBLREACH      : Self = Self(1 << 34);
 
-    pub const HON           : Self = Self(1 << 35);
-    pub const HON_N         : Self = Self(1 << 36);
+    pub const HONISO        : Self = Self(1 << 35);
+    pub const HONISO_N      : Self = Self(1 << 36);
     pub const JUNCHAN       : Self = Self(1 << 37);
     pub const JUNCHAN_N     : Self = Self(1 << 38);
     pub const LIANGPEKO     : Self = Self(1 << 39);
 
-    pub const CHIN          : Self = Self(1 << 40);
-    pub const CHIN_N        : Self = Self(1 << 41);
+    pub const CHINISO       : Self = Self(1 << 40);
+    pub const CHINISO_N     : Self = Self(1 << 41);
 
-    pub const YAKU_END: Self = Self::CHIN_N;
+    pub const END: Self = Self::CHINISO_N;
 }
 
-// TODO: YAKUMAN
+#[rustfmt::skip]
+impl Yakuman {
+    pub const KOKUSHI       : Self = Self(1 <<  0);
+    pub const SUANKO        : Self = Self(1 <<  1);
+    pub const DAISANGEN     : Self = Self(1 <<  2);
+    pub const TUISO         : Self = Self(1 <<  3);
+    pub const SHOSUSHI      : Self = Self(1 <<  4);
+    pub const DAISUSHI      : Self = Self(1 <<  5);
+    pub const RYUISO        : Self = Self(1 <<  6);
+    pub const CHINROTO      : Self = Self(1 <<  7);
+    pub const SUKAN         : Self = Self(1 <<  8);
+    pub const CHUREN        : Self = Self(1 <<  9);
+    pub const TENHO         : Self = Self(1 << 10);
+    pub const CHIHO         : Self = Self(1 << 11);
+
+    pub const END: Self = Self::CHIHO;
+}
 
 impl Yaku {
     pub fn fan_sum(bits: u64) -> u32 {
         let mut sum = 0;
         let mut bit = 1u64;
-        while bit <= Yaku::YAKU_END.0 {
+        while bit <= Yaku::END.0 {
             if bits & bit != 0 {
                 sum += Yaku(bit).fan();
             }
@@ -104,18 +122,18 @@ impl Yaku {
             | Self::CHITOI
             | Self::TOITOI
             | Self::SANANKO
-            | Self::HONRO
+            | Self::HONROTO
             | Self::DOKO
             | Self::SANKAN
             | Self::SHOSANGEN
             | Self::DBLREACH => 2,
             Self::DOJUN_N | Self::ITTSU_N | Self::CHANTA_N => 1,
 
-            Self::HON | Self::JUNCHAN | Self::LIANGPEKO => 3,
-            Self::HON_N | Self::JUNCHAN_N => 2,
+            Self::HONISO | Self::JUNCHAN | Self::LIANGPEKO => 3,
+            Self::HONISO_N | Self::JUNCHAN_N => 2,
 
-            Self::CHIN => 6,
-            Self::CHIN_N => 5,
+            Self::CHINISO => 6,
+            Self::CHINISO_N => 5,
 
             inv => panic!("Invalid Yaku: {}", inv.0),
         }
@@ -125,9 +143,9 @@ impl Yaku {
         let mut result = Vec::new();
 
         let mut bit = 1u64;
-        while bit <= Yaku::YAKU_END.0 {
+        while bit <= Self::END.0 {
             if bits & bit != 0 {
-                result.push(Yaku(bit).to_japanese_str());
+                result.push(Self(bit).to_japanese_str());
             }
             bit <<= 1;
         }
@@ -136,7 +154,6 @@ impl Yaku {
     }
 
     pub fn to_japanese_str(self) -> &'static str {
-        // https://ja.wikipedia.org/wiki/%E9%BA%BB%E9%9B%80%E3%81%AE%E5%BD%B9%E4%B8%80%E8%A6%A7
         match self {
             Self::REACH => "立直",
             Self::IPPATSU => "一発",
@@ -168,18 +185,85 @@ impl Yaku {
             Self::CHITOI => "七対子",
             Self::TOITOI => "対々和",
             Self::SANANKO => "三暗刻",
-            Self::HONRO => "混老頭",
+            Self::HONROTO => "混老頭",
             Self::DOKO => "三色同刻",
             Self::SANKAN => "三槓子",
             Self::SHOSANGEN => "小三元",
             Self::DBLREACH => "ダブル立直",
-            Self::HON => "混一色",
-            Self::HON_N => "混一色↓",
+            Self::HONISO => "混一色",
+            Self::HONISO_N => "混一色↓",
             Self::JUNCHAN => "純全帯么九",
             Self::JUNCHAN_N => "純全帯么九↓",
             Self::LIANGPEKO => "二盃口",
-            Self::CHIN => "清一色",
-            Self::CHIN_N => "清一色↓",
+            Self::CHINISO => "清一色",
+            Self::CHINISO_N => "清一色↓",
+
+            inv => panic!("Invalid Yaku: {}", inv.0),
+        }
+    }
+}
+
+impl Yakuman {
+    pub fn count_all(bits: u32) -> u32 {
+        let mut sum = 0;
+        let mut bit = 1;
+        while bit <= Self::END.0 {
+            if bits & bit != 0 {
+                sum += Self(bit).count();
+            }
+            bit <<= 1;
+        }
+
+        sum
+    }
+
+    pub fn count(&self) -> u32 {
+        match *self {
+            Self::KOKUSHI
+            | Self::SUANKO
+            | Self::DAISANGEN
+            | Self::TUISO
+            | Self::SHOSUSHI
+            | Self::DAISUSHI
+            | Self::RYUISO
+            | Self::CHINROTO
+            | Self::SUKAN
+            | Self::CHUREN
+            | Self::TENHO
+            | Self::CHIHO => 1,
+
+            inv => panic!("Invalid Yakuman: {}", inv.0),
+        }
+    }
+
+    pub fn to_japanese_list(bits: u32) -> Vec<&'static str> {
+        let mut result = Vec::new();
+
+        let mut bit = 1;
+        while bit <= Self::END.0 {
+            if bits & bit != 0 {
+                result.push(Self(bit).to_japanese_str());
+            }
+            bit <<= 1;
+        }
+
+        result
+    }
+
+    pub fn to_japanese_str(self) -> &'static str {
+        match self {
+            Self::KOKUSHI => "国士無双",
+            Self::SUANKO => "四暗刻",
+            Self::DAISANGEN => "大三元",
+            Self::TUISO => "字一色",
+            Self::SHOSUSHI => "小四喜",
+            Self::DAISUSHI => "大四喜",
+            Self::RYUISO => "緑一色",
+            Self::CHINROTO => "清老頭",
+            Self::SUKAN => "四槓子",
+            Self::CHUREN => "九蓮宝燈",
+            Self::TENHO => "天和",
+            Self::CHIHO => "地和",
 
             inv => panic!("Invalid Yaku: {}", inv.0),
         }
@@ -357,7 +441,7 @@ pub fn check_yaku(hand: &FinishHand, param: &PointParam, menzen: bool) -> u64 {
             true
         };
         if yes1 && yes2 {
-            yaku |= Yaku::HONRO.0;
+            yaku |= Yaku::HONROTO.0;
         }
     }
     {
@@ -425,14 +509,19 @@ pub fn check_yaku(hand: &FinishHand, param: &PointParam, menzen: bool) -> u64 {
             }
         }
         if yes {
-            yaku |= if menzen { Yaku::HON.0 } else { Yaku::HON_N.0 };
+            yaku |= if menzen {
+                Yaku::HONISO.0
+            } else {
+                Yaku::HONISO_N.0
+            };
         }
     }
     {
         let yes1 = hand.mianzi_list.iter().all(|m| m.is_junchan());
         let yes2 = if let Some(head) = hand.head {
-            super::is_jun(head).unwrap()
+            super::is_roto(head).unwrap()
         } else {
+            // chitoi
             true
         };
         if yes1 && yes2 {
@@ -477,7 +566,11 @@ pub fn check_yaku(hand: &FinishHand, param: &PointParam, menzen: bool) -> u64 {
                 true
             };
             if yes1 && yes2 {
-                yaku |= if menzen { Yaku::CHIN.0 } else { Yaku::CHIN_N.0 };
+                yaku |= if menzen {
+                    Yaku::CHINISO.0
+                } else {
+                    Yaku::CHINISO_N.0
+                };
             }
         }
     }
@@ -488,9 +581,9 @@ pub fn check_yaku(hand: &FinishHand, param: &PointParam, menzen: bool) -> u64 {
 fn normalize_yaku(org: u64) -> u64 {
     let mut val = org;
 
-    if val & Yaku::CHIN.0 != 0 || val & Yaku::CHIN_N.0 != 0 {
-        val &= !Yaku::HON.0;
-        val &= !Yaku::HON_N.0;
+    if val & Yaku::CHINISO.0 != 0 || val & Yaku::CHINISO_N.0 != 0 {
+        val &= !Yaku::HONISO.0;
+        val &= !Yaku::HONISO_N.0;
     }
     if val & Yaku::LIANGPEKO.0 != 0 {
         val &= !Yaku::IPEKO.0;
@@ -499,12 +592,155 @@ fn normalize_yaku(org: u64) -> u64 {
         val &= !Yaku::CHANTA.0;
         val &= !Yaku::CHANTA_N.0;
     }
-    if val & Yaku::HONRO.0 != 0 {
+    if val & Yaku::HONROTO.0 != 0 {
         val &= !Yaku::CHANTA.0;
         val &= !Yaku::CHANTA_N.0;
     }
 
     val
+}
+
+pub fn check_yakuman(hand: &FinishHand, param: &PointParam, menzen: bool) -> u32 {
+    let mut yakuman = 0;
+    // kokushi: not checked here
+    {
+        let count = hand
+            .mianzi_list
+            .iter()
+            .filter(|m| m.mtype.is_same() && m.mtype.is_blind())
+            .count();
+        if count >= 4 {
+            yakuman |= Yakuman::SUANKO.0;
+        }
+    }
+    {
+        let mut s1 = false;
+        let mut s2 = false;
+        let mut s3 = false;
+        for m in hand.mianzi_list.iter().filter(|m| m.mtype.is_same()) {
+            match m.pai {
+                31 => s1 = true,
+                32 => s2 = true,
+                33 => s3 = true,
+                _ => {}
+            }
+        }
+        if s1 && s2 && s3 {
+            yakuman |= Yakuman::DAISANGEN.0;
+        }
+    }
+    {
+        let yes1 = hand
+            .mianzi_list
+            .iter()
+            .all(|m| super::is_ji(m.pai).unwrap());
+        let yes2 = if let Some(head) = hand.head {
+            super::is_ji(head).unwrap()
+        } else {
+            // chitoi
+            true
+        };
+        if yes1 && yes2 {
+            yakuman |= Yakuman::TUISO.0;
+        }
+    }
+    {
+        let mut s1 = false;
+        let mut s2 = false;
+        let mut s3 = false;
+        let mut s4 = false;
+        for m in hand.mianzi_list.iter().filter(|m| m.mtype.is_same()) {
+            match m.pai {
+                27 => s1 = true,
+                28 => s2 = true,
+                29 => s3 = true,
+                30 => s4 = true,
+                _ => {}
+            }
+        }
+        if s1 && s2 && s3 && s4 {
+            yakuman |= Yakuman::DAISUSHI.0;
+        } else if let Some(head) = hand.head {
+            if (head == 27 && s2 && s3 && s4)
+                || (s1 && head == 28 && s3 && s4)
+                || (s1 && s2 && head == 29 && s4)
+                || (s1 && s2 && s3 && head == 30)
+            {
+                yakuman |= Yakuman::SHOSUSHI.0;
+            }
+        }
+    }
+    if let Some(_head) = hand.head {
+        // TODO: ryuiso
+    }
+    if let Some(head) = hand.head {
+        let yes1 = super::is_roto(head).unwrap();
+        let yes2 = hand.mianzi_list.iter().all(|m| m.is_chinro());
+        if yes1 && yes2 {
+            yakuman |= Yakuman::CHINROTO.0;
+        }
+    }
+    {
+        let count = hand.mianzi_list.iter().filter(|m| m.mtype.is_kan()).count();
+        if count >= 4 {
+            yakuman |= Yakuman::SUKAN.0;
+        }
+    }
+    if let Some(head) = hand.head {
+        if menzen {
+            let mut bucket: [u8; super::PAI_COUNT] = [0; super::PAI_COUNT];
+            bucket[head as usize] += 2;
+            for m in hand.mianzi_list.iter() {
+                // kan is not allowed
+                if m.mtype.is_kan() {
+                    break;
+                }
+                m.to_bucket(&mut bucket);
+            }
+            for kind in 0u8..=2u8 {
+                let mut yes = true;
+                let mut one_more = false;
+                let req_table = [0, 3, 1, 1, 1, 1, 1, 1, 1, 3];
+                for num in 1u8..=9u8 {
+                    let pai = super::encode(kind, num).unwrap();
+                    let has = bucket[pai as usize];
+                    let req = req_table[num as usize];
+                    if has >= req {
+                        if has == req + 1 {
+                            if one_more {
+                                yes = false;
+                                break;
+                            }
+                            one_more = true;
+                        } else if has != req {
+                            yes = false;
+                            break;
+                        }
+                    } else {
+                        yes = false;
+                        break;
+                    }
+                }
+                if yes {
+                    yakuman |= Yakuman::CHUREN.0;
+                    break;
+                }
+            }
+        }
+    }
+    if param.tenchi {
+        if param.is_parent() {
+            yakuman |= Yakuman::TENHO.0;
+        } else {
+            yakuman |= Yakuman::CHIHO.0;
+        }
+    }
+
+    normalize_yakuman(yakuman)
+}
+
+fn normalize_yakuman(org: u32) -> u32 {
+    org
 }
 
 #[cfg(test)]
@@ -515,7 +751,7 @@ mod tests {
     #[test]
     fn fan_all() {
         let mut bit = 1u64;
-        while bit <= Yaku::YAKU_END.0 {
+        while bit <= Yaku::END.0 {
             let fan = Yaku(bit).fan();
             assert!(fan > 0);
             bit <<= 1;
@@ -525,7 +761,7 @@ mod tests {
     #[test]
     fn japanese_all() {
         let mut bit = 1u64;
-        while bit <= Yaku::YAKU_END.0 {
+        while bit <= Yaku::END.0 {
             let j = Yaku(bit).to_japanese_str();
             assert!(j.len() > 0);
             bit <<= 1;

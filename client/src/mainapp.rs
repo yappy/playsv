@@ -18,11 +18,8 @@ fn apiroot() -> &'static str {
 }
 
 fn version() -> String {
-    let debug = if env!("VERGEN_CARGO_DEBUG") == "true" {
-        "debug"
-    } else {
-        "release"
-    };
+    let is_debug: bool = env!("VERGEN_CARGO_DEBUG").parse().unwrap();
+    let debug = if is_debug { "debug" } else { "release" };
     let src = vec![
         env!("VERGEN_GIT_DESCRIBE"),
         env!("VERGEN_GIT_COMMIT_DATE"),

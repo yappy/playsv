@@ -1,5 +1,9 @@
 use crate::mainapp::{HitBox, ImageSet};
-use game::mjsys::{self, yaku::Yaku, Hand, Mianzi, MianziType, Point, PointParam, Reach};
+use game::mjsys::{
+    self,
+    yaku::{Yaku, Yakuman},
+    Hand, Mianzi, MianziType, Point, PointParam, Reach,
+};
 use rand::prelude::*;
 use std::rc::Rc;
 use web_sys::CanvasRenderingContext2d;
@@ -211,6 +215,9 @@ impl TestMode {
 
         let yakus = Yaku::to_japanese_list(point.yaku);
         texts.extend(yakus.iter().map(|s| s.to_string()));
+        texts.push("".to_string());
+        let yakumans = Yakuman::to_japanese_list(point.yakuman);
+        texts.extend(yakumans.iter().map(|s| s.to_string()));
 
         texts
     }
