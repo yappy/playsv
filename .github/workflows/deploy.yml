@@ -21,13 +21,31 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # Checkout main and build
+      - uses: actions/checkout@v3
+        with:
+          ref: refs/heads/main
+          fetch-depth: 0
+
+      - uses: jetli/trunk-action@v0.4.0
+        with:
+          version: 'latest'
+
+      - name: Tools
+        run: |
+          rustup target add wasm32-unknown-unknown
+
+      - name: Build
+        working-directory: ./client
+        run: |
+          trunk build --release --filehash false --public-url ${{ env.public_url }}
+
+      # Checkout deploy and commit + push
       - uses: actions/checkout@v3
         with:
           ref: ${{ env.ref }}
           fetch-depth: 0
-      - uses: jetli/trunk-action@v0.4.0
-        with:
-          version: 'latest'
+          clean: false
 
       - name: Git Setup
         run: |
@@ -39,19 +57,12 @@ jobs:
         run: |
           git merge --no-ff ${GITHUB_SHA}
 
-      - name: Tools
-        run: |
-          rustup target add wasm32-unknown-unknown
-
-      - name: Build
-        working-directory: ./client
-        run: |
-          trunk build --release --public-url ${{ env.public_url }}
-
       - name: Remove Old Data and Move
         run: |
           git rm --ignore-unmatch ./docs/?*.*
-          mv ./client/dist/* ./docs/
+          mv ./client/dist/client-*.wasm ./docs/
+          mv ./client/dist/client-*.js ./docs/
+          mv ./client/dist/index.html ./docs/
 
       - name: Git Add
         run: |
