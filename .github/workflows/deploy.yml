@@ -10,7 +10,7 @@ on:
       - v*
 
 env:
-  ref: refs/heads/deploy
+  dest: deploy
   # for trunk build
   # GitHub Pages URL will be
   # https://<user>.github.io/playsv/
@@ -40,28 +40,22 @@ jobs:
         run: |
           trunk build --release --filehash false --public-url ${{ env.public_url }}
 
-      # Checkout deploy and commit + push
-      - uses: actions/checkout@v3
-        with:
-          ref: ${{ env.ref }}
-          fetch-depth: 0
-          clean: false
-
       - name: Git Setup
         run: |
           git remote set-url origin https://github-actions:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}
           git config --local user.name "github-actions[bot]"
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Merge from main
+      - name: Switch and Merge from main
         run: |
+          git switch ${{ env.dest }}
           git merge --no-ff ${GITHUB_SHA}
 
       - name: Remove Old Data and Move
         run: |
           git rm --ignore-unmatch ./docs/?*.*
-          mv ./client/dist/client-*.wasm ./docs/
-          mv ./client/dist/client-*.js ./docs/
+          mv ./client/dist/client*.wasm ./docs/
+          mv ./client/dist/client*.js ./docs/
           mv ./client/dist/index.html ./docs/
 
       - name: Git Add
@@ -75,4 +69,4 @@ jobs:
 
       - name: Git Push
         run: |
-          git push origin HEAD:${{ env.ref }}
+          git push
