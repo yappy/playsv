@@ -395,7 +395,7 @@ impl FinishHand {
 // The order means priorities for sort keys
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Point {
-    pub yakuman_count:u32,
+    pub yakuman_count: u32,
     pub base_point: u32,
     pub fan: u32,
     pub fu: u32,
@@ -605,7 +605,7 @@ fn finish_chitoi(hand: &Hand, result: &mut Vec<FinishHand>) -> Result<()> {
     Ok(())
 }
 
-fn finish_kokushi(hand: &Hand, result: &mut Vec<FinishHand>) -> Result<()> {
+fn finish_kokushi(_hand: &Hand, _result: &mut Vec<FinishHand>) -> Result<()> {
     //TODO
     Ok(())
 }
@@ -890,14 +890,21 @@ pub fn calc_base_point(hand: &FinishHand, param: &PointParam) -> Point {
     calc_base_point_direct(yakuman_count, fan, fu, yaku, yakuman)
 }
 
-pub fn calc_base_point_direct(yakuman_count:u32, fan: u32, fu: u32, yaku: u64, yakuman: u32) -> Point {
+pub fn calc_base_point_direct(
+    yakuman_count: u32,
+    fan: u32,
+    fu: u32,
+    yaku: u64,
+    yakuman: u32,
+) -> Point {
     // TODO: 7700 or 8000 rule
 
     // mangan limit
     let base_point = if fan < 5 { fu << (fan + 2) } else { 2000 };
     let base_point = base_point.min(2000);
 
-    Point {yakuman_count,
+    Point {
+        yakuman_count,
         base_point,
         fan,
         fu,
