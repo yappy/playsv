@@ -273,6 +273,10 @@ impl Yakuman {
 pub fn check_yaku(hand: &FinishHand, param: &PointParam, menzen: bool) -> u64 {
     let mut yaku = 0;
 
+    if hand.finish_type == FinishType::Kokushi {
+        return yaku;
+    }
+
     // 1
     if param.reach == Reach::Single {
         yaku |= Yaku::REACH.0;
@@ -519,7 +523,7 @@ pub fn check_yaku(hand: &FinishHand, param: &PointParam, menzen: bool) -> u64 {
     {
         let yes1 = hand.mianzi_list.iter().all(|m| m.is_junchan());
         let yes2 = if let Some(head) = hand.head {
-            super::is_roto(head).unwrap()
+            super::is_yao(head).unwrap()
         } else {
             // chitoi
             true
@@ -602,7 +606,11 @@ fn normalize_yaku(org: u64) -> u64 {
 
 pub fn check_yakuman(hand: &FinishHand, param: &PointParam, menzen: bool) -> u32 {
     let mut yakuman = 0;
-    // kokushi: not checked here
+
+    if hand.finish_type == FinishType::Kokushi {
+        yakuman |= Yakuman::KOKUSHI.0;
+        return yakuman;
+    }
     {
         let count = hand
             .mianzi_list
@@ -674,7 +682,7 @@ pub fn check_yakuman(hand: &FinishHand, param: &PointParam, menzen: bool) -> u32
         // TODO: ryuiso
     }
     if let Some(head) = hand.head {
-        let yes1 = super::is_roto(head).unwrap();
+        let yes1 = super::is_yao(head).unwrap();
         let yes2 = hand.mianzi_list.iter().all(|m| m.is_chinro());
         if yes1 && yes2 {
             yakuman |= Yakuman::CHINROTO.0;

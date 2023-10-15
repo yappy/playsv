@@ -14,6 +14,7 @@ ji   : 27-33
 
 pub mod yaku;
 
+use anyhow::Ok;
 use anyhow::{anyhow, bail, ensure, Result};
 use yaku::Yaku;
 use yaku::Yakuman;
@@ -71,19 +72,13 @@ pub fn is_num(code: u8) -> Result<bool> {
 pub fn is_sangen(code: u8) -> Result<bool> {
     let (kind, num) = decode(code)?;
 
-    Ok(kind == KIND_Z && (5..7).contains(&num))
+    Ok(kind == KIND_Z && (5..=7).contains(&num))
 }
 
 pub fn is_yao(code: u8) -> Result<bool> {
     let (kind, num) = decode(code)?;
 
     Ok(kind == KIND_Z || num == 1 || num == 9)
-}
-
-pub fn is_roto(code: u8) -> Result<bool> {
-    let (kind, num) = decode(code)?;
-
-    Ok(kind < KIND_Z && (num == 1 || num == 9))
 }
 
 pub fn is_tanyao(code: u8) -> Result<bool> {
@@ -606,8 +601,97 @@ fn finish_chitoi(hand: &Hand, result: &mut Vec<FinishHand>) -> Result<()> {
     Ok(())
 }
 
-fn finish_kokushi(_hand: &Hand, _result: &mut Vec<FinishHand>) -> Result<()> {
-    //TODO
+fn finish_kokushi(hand: &Hand, result: &mut Vec<FinishHand>) -> Result<()> {
+    if !hand.mianzi_list.is_empty() {
+        return Ok(());
+    }
+    if let Some(fin) = hand.finish_pai {
+        if is_tanyao(fin)? {
+            return Ok(());
+        }
+    }
+
+    let mut wait: Option<u8> = None;
+    let mut have2: Option<u8> = None;
+    for (pai, &count) in hand.bucket.iter().enumerate() {
+        let pai = pai as u8;
+        if is_tanyao(pai)? {
+            if count > 0 {
+                return Ok(());
+            } else {
+                continue;
+            }
+        }
+        debug_assert!(is_yao(pai)?);
+        match count {
+            0 => {
+                if wait.is_none() {
+                    wait = Some(pai);
+                } else {
+                    return Ok(());
+                }
+            }
+            1 => {}
+            2 => {
+                if have2.is_none() {
+                    have2 = Some(pai);
+                } else {
+                    return Ok(());
+                }
+            }
+            _ => return Ok(()),
+        }
+    }
+    if have2.is_some() {
+        if let Some(wait) = wait {
+            // normal tanpai
+            if let Some(fin) = hand.finish_pai {
+                if fin == wait {
+                    result.push(FinishHand {
+                        finish_type: FinishType::Kokushi,
+                        mianzi_list: Vec::new(),
+                        head: have2,
+                        finish_pai: fin,
+                        tumo: hand.tumo,
+                    });
+                }
+            } else {
+                result.push(FinishHand {
+                    finish_type: FinishType::Kokushi,
+                    mianzi_list: Vec::new(),
+                    head: have2,
+                    finish_pai: wait,
+                    tumo: hand.tumo,
+                });
+            }
+        }
+    } else if have2.is_none() && wait.is_none() {
+        // rising sun
+        if let Some(fin) = hand.finish_pai {
+            // checked at first
+            debug_assert!(is_yao(fin)?);
+            result.push(FinishHand {
+                finish_type: FinishType::Kokushi,
+                mianzi_list: Vec::new(),
+                head: Some(fin),
+                finish_pai: fin,
+                tumo: hand.tumo,
+            });
+        } else {
+            for pai in 0..PAI_COUNT_U8 {
+                if is_yao(pai).unwrap() {
+                    result.push(FinishHand {
+                        finish_type: FinishType::Kokushi,
+                        mianzi_list: Vec::new(),
+                        head: Some(pai),
+                        finish_pai: pai,
+                        tumo: hand.tumo,
+                    });
+                }
+            }
+        }
+    }
+
     Ok(())
 }
 
@@ -1200,6 +1284,33 @@ mod tests {
 
         assert_eq!(point1, point2);
         assert_eq!(Yaku::TANYAO.0, point1.yaku);
+
+        Ok(())
+    }
+
+    #[test]
+    fn fu_complex() -> Result<()> {
+        // head: +2
+        // 999m: +8 if tumo, +4 elsewhere
+        // +2 if tumo
+        // If tumo, 20 + 12 = 32 => 40 fu
+        let mut hand = from_human_readable_string("99m345678p234s77z 9m")?;
+        //println!("{:?}", hand);
+        let param = PointParam {
+            field_wind: 0,
+            self_wind: 3,
+            ..Default::default()
+        };
+        let mut result = Vec::new();
+        all_finish_patterns(&mut hand, &mut result)?;
+
+        let mut points: Vec<_> = result.iter().map(|r| calc_base_point(r, &param)).collect();
+        points.sort();
+        let point = points.pop().unwrap();
+
+        assert_eq!(1, point.fan);
+        assert_eq!(40, point.fu);
+        assert_eq!((400, 700), point.calc_point_c_tumo());
 
         Ok(())
     }
