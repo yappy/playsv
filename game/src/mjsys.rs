@@ -15,8 +15,8 @@ ji   : 27-33
 pub mod yaku;
 
 use anyhow::{anyhow, bail, ensure, Result};
-
 use yaku::Yaku;
+use yaku::Yakuman;
 
 pub const PAI_COUNT: usize = 34;
 pub const PAI_COUNT_U8: u8 = 34;
@@ -80,7 +80,7 @@ pub fn is_yao(code: u8) -> Result<bool> {
     Ok(kind == KIND_Z || num == 1 || num == 9)
 }
 
-pub fn is_jun(code: u8) -> Result<bool> {
+pub fn is_roto(code: u8) -> Result<bool> {
     let (kind, num) = decode(code)?;
 
     Ok(kind < KIND_Z && (num == 1 || num == 9))
@@ -303,6 +303,12 @@ impl Mianzi {
             kind < 3 && (num == 1 || num == 9)
         }
     }
+
+    pub fn is_chinro(&self) -> bool {
+        let (kind, num) = decode(self.pai).unwrap();
+
+        self.mtype.is_same() && kind < 3 && (num == 1 || num == 9)
+    }
 }
 
 // calc in progress
@@ -359,6 +365,7 @@ pub struct FinishHand {
     // None only if chitoi
     // if tanki, head = finish_pai
     head: Option<u8>,
+    #[allow(dead_code)]
     finish_pai: u8,
     tumo: bool,
 }
@@ -389,11 +396,14 @@ impl FinishHand {
 // The order means priorities for sort keys
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Point {
+    pub yakuman_count: u32,
     pub base_point: u32,
     pub fan: u32,
     pub fu: u32,
-    // YAKU*
+    // Yaku::*
     pub yaku: u64,
+    // Yakuman::*
+    pub yakuman: u32,
 }
 
 impl Point {
@@ -404,52 +414,68 @@ impl Point {
     pub fn calc_point_p_tumo(&self) -> u32 {
         assert!(self.base_point <= 2000);
 
-        match self.fan {
-            0..=4 => roundup100(self.base_point * 2),
-            5 => 4000,
-            6..=7 => 6000,
-            8..=10 => 8000,
-            11..=12 => 12000,
-            13.. => 16000,
+        if self.yakuman_count > 0 {
+            16000 * self.yakuman_count
+        } else {
+            match self.fan {
+                0..=4 => roundup100(self.base_point * 2),
+                5 => 4000,
+                6..=7 => 6000,
+                8..=10 => 8000,
+                11..=12 => 12000,
+                13.. => 16000,
+            }
         }
     }
 
     pub fn calc_point_p_ron(&self) -> u32 {
         assert!(self.base_point <= 2000);
 
-        match self.fan {
-            0..=4 => roundup100(self.base_point * 6),
-            5 => 12000,
-            6..=7 => 18000,
-            8..=10 => 24000,
-            11..=12 => 36000,
-            13.. => 48000,
+        if self.yakuman_count > 0 {
+            48000 * self.yakuman_count
+        } else {
+            match self.fan {
+                0..=4 => roundup100(self.base_point * 6),
+                5 => 12000,
+                6..=7 => 18000,
+                8..=10 => 24000,
+                11..=12 => 36000,
+                13.. => 48000,
+            }
         }
     }
 
     pub fn calc_point_c_tumo(&self) -> (u32, u32) {
         assert!(self.base_point <= 2000);
 
-        match self.fan {
-            0..=4 => (roundup100(self.base_point), roundup100(self.base_point * 2)),
-            5 => (2000, 4000),
-            6..=7 => (3000, 6000),
-            8..=10 => (4000, 8000),
-            11..=12 => (6000, 12000),
-            13.. => (8000, 16000),
+        if self.yakuman_count > 0 {
+            (8000 * self.yakuman_count, 16000 * self.yakuman_count)
+        } else {
+            match self.fan {
+                0..=4 => (roundup100(self.base_point), roundup100(self.base_point * 2)),
+                5 => (2000, 4000),
+                6..=7 => (3000, 6000),
+                8..=10 => (4000, 8000),
+                11..=12 => (6000, 12000),
+                13.. => (8000, 16000),
+            }
         }
     }
 
     pub fn calc_point_c_ron(&self) -> u32 {
         assert!(self.base_point <= 2000);
 
-        match self.fan {
-            0..=4 => roundup100(self.base_point * 4),
-            5 => 8000,
-            6..=7 => 12000,
-            8..=10 => 16000,
-            11..=12 => 24000,
-            13.. => 36000,
+        if self.yakuman_count > 0 {
+            32000 * self.yakuman_count
+        } else {
+            match self.fan {
+                0..=4 => roundup100(self.base_point * 4),
+                5 => 8000,
+                6..=7 => 12000,
+                8..=10 => 16000,
+                11..=12 => 24000,
+                13.. => 32000,
+            }
         }
     }
 }
@@ -481,6 +507,12 @@ pub struct PointParam {
 }
 
 impl PointParam {
+    pub fn is_parent(&self) -> bool {
+        assert!(self.self_wind < 4);
+
+        self.self_wind == 0
+    }
+
     pub fn field_wind_pi(&self) -> u8 {
         assert!(self.field_wind < 4);
 
@@ -574,7 +606,7 @@ fn finish_chitoi(hand: &Hand, result: &mut Vec<FinishHand>) -> Result<()> {
     Ok(())
 }
 
-fn finish_kokushi(hand: &Hand, result: &mut Vec<FinishHand>) -> Result<()> {
+fn finish_kokushi(_hand: &Hand, _result: &mut Vec<FinishHand>) -> Result<()> {
     //TODO
     Ok(())
 }
@@ -838,6 +870,8 @@ pub fn calc_base_point(hand: &FinishHand, param: &PointParam) -> Point {
     let menzen = hand.mianzi_list.iter().all(|m| m.mtype.is_menzen());
 
     let mut yaku = yaku::check_yaku(hand, param, menzen);
+    let yakuman = yaku::check_yakuman(hand, param, menzen);
+    let yakuman_count = Yakuman::count_all(yakuman);
     let fu = calc_fu(hand, param, menzen);
     if menzen && ((hand.tumo && fu == 20) || (!hand.tumo && fu == 30)) {
         yaku |= yaku::Yaku::PINHU.0;
@@ -854,10 +888,16 @@ pub fn calc_base_point(hand: &FinishHand, param: &PointParam) -> Point {
     }
     let fan = fan1 + fan2;
 
-    calc_base_point_direct(fan, fu, yaku)
+    calc_base_point_direct(yakuman_count, fan, fu, yaku, yakuman)
 }
 
-pub fn calc_base_point_direct(fan: u32, fu: u32, yaku: u64) -> Point {
+pub fn calc_base_point_direct(
+    yakuman_count: u32,
+    fan: u32,
+    fu: u32,
+    yaku: u64,
+    yakuman: u32,
+) -> Point {
     // TODO: 7700 or 8000 rule
 
     // mangan limit
@@ -865,10 +905,12 @@ pub fn calc_base_point_direct(fan: u32, fu: u32, yaku: u64) -> Point {
     let base_point = base_point.min(2000);
 
     Point {
+        yakuman_count,
         base_point,
         fan,
         fu,
         yaku,
+        yakuman,
     }
 }
 
@@ -1001,7 +1043,7 @@ mod tests {
 
         for (i1, &fan) in fan_list.iter().enumerate() {
             for (i2, &fu) in fu_list.iter().enumerate() {
-                let point = calc_base_point_direct(fan, fu, 0);
+                let point = calc_base_point_direct(0, fan, fu, 0, 0);
 
                 if p_ron[i1][i2] != 0 {
                     assert_eq!(p_ron[i1][i2], point.calc_point_p_ron());
@@ -1107,7 +1149,7 @@ mod tests {
         assert_eq!(6, point.fan);
         assert_eq!(25, point.fu);
         assert_eq!(
-            Yaku::REACH.0 | Yaku::TSUMO.0 | Yaku::CHITOI.0 | Yaku::HONRO.0,
+            Yaku::REACH.0 | Yaku::TSUMO.0 | Yaku::CHITOI.0 | Yaku::HONROTO.0,
             point.yaku
         );
 
@@ -1115,7 +1157,7 @@ mod tests {
         assert_eq!(7, point.fan);
         assert_eq!(25, point.fu);
         assert_eq!(
-            Yaku::REACH.0 | Yaku::TSUMO.0 | Yaku::CHITOI.0 | Yaku::HON.0,
+            Yaku::REACH.0 | Yaku::TSUMO.0 | Yaku::CHITOI.0 | Yaku::HONISO.0,
             point.yaku
         );
 
@@ -1123,7 +1165,7 @@ mod tests {
         assert_eq!(10, point.fan);
         assert_eq!(25, point.fu);
         assert_eq!(
-            Yaku::REACH.0 | Yaku::TSUMO.0 | Yaku::CHITOI.0 | Yaku::CHIN.0,
+            Yaku::REACH.0 | Yaku::TSUMO.0 | Yaku::CHITOI.0 | Yaku::CHINISO.0,
             point.yaku
         );
 

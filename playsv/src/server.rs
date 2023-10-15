@@ -16,12 +16,9 @@ const JS: &str = include_str!(concat!(env!("OUT_DIR"), "/client.js"));
 const WASM: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/client_bg.wasm"));
 
 fn version() -> String {
-    let debug = if env!("VERGEN_CARGO_DEBUG") == "true" {
-        "debug"
-    } else {
-        "release"
-    };
-    let src = vec![
+    let is_debug = env!("VERGEN_CARGO_DEBUG").parse().unwrap();
+    let debug = if is_debug { "debug" } else { "release" };
+    let src = [
         env!("VERGEN_GIT_DESCRIBE"),
         env!("VERGEN_GIT_COMMIT_DATE"),
         debug,
