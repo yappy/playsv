@@ -85,6 +85,15 @@ pub fn is_tanyao(code: u8) -> Result<bool> {
     Ok(!is_yao(code)?)
 }
 
+pub fn is_green(code: u8) -> Result<bool> {
+    let (kind, num) = decode(code)?;
+
+    let b1 = (kind == KIND_S) && (num == 2 || num == 3 || num == 4 || num == 6 || num == 8);
+    let b2 = (kind == KIND_Z) && (num == 6);
+
+    Ok(b1 || b2)
+}
+
 pub fn to_human_readable_string(code: u8) -> Result<String> {
     let kind_char = ['m', 'p', 's', 'z'];
     let (kind, num) = decode(code)?;
@@ -303,6 +312,15 @@ impl Mianzi {
         let (kind, num) = decode(self.pai).unwrap();
 
         self.mtype.is_same() && kind < 3 && (num == 1 || num == 9)
+    }
+
+    pub fn is_green(&self) -> bool {
+        if self.mtype.is_ordered() {
+            // 2s
+            self.pai == OFFSET_S + 1
+        } else {
+            is_green(self.pai).unwrap()
+        }
     }
 }
 
