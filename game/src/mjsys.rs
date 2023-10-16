@@ -368,6 +368,14 @@ impl FinishType {
             FinishType::Kanchan | FinishType::Penchan | FinishType::Tanki => 2,
         }
     }
+
+    pub fn is_special(&self) -> bool {
+        matches!(self, FinishType::Chitoi | FinishType::Kokushi)
+    }
+
+    pub fn is_normal(&self) -> bool {
+        !self.is_special()
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -975,7 +983,10 @@ pub fn calc_base_point(hand: &FinishHand, param: &PointParam) -> Point {
     let yakuman = yaku::check_yakuman(hand, param, menzen);
     let yakuman_count = Yakuman::count_all(yakuman);
     let fu = calc_fu(hand, param, menzen);
-    if menzen && ((hand.tumo && fu == 20) || (!hand.tumo && fu == 30)) {
+    if menzen
+        && hand.finish_type.is_normal()
+        && ((hand.tumo && fu == 20) || (!hand.tumo && fu == 30))
+    {
         yaku |= yaku::Yaku::PINHU.0;
     }
 
