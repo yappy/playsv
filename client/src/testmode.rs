@@ -188,7 +188,7 @@ impl TestMode {
         }
 
         let point = point.as_ref().unwrap();
-        if point.fan == 0 {
+        if point.fan == 0 && point.yakuman_count == 0{
             texts.push("錯和 役なし".to_string());
             return texts;
         }
@@ -196,7 +196,7 @@ impl TestMode {
         if parent {
             if tumo {
                 let p_tumo = point.calc_point_p_tumo();
-                texts.push(format!("{}符 {}翻 {}all", point.fu, point.fan, p_tumo));
+                texts.push(format!("{}符 {}翻 {} all", point.fu, point.fan, p_tumo));
             } else {
                 let p_ron = point.calc_point_p_ron();
                 texts.push(format!("{}符 {}翻 {}", point.fu, point.fan, p_ron));
