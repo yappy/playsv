@@ -188,7 +188,7 @@ impl TestMode {
         }
 
         let point = point.as_ref().unwrap();
-        if point.fan == 0 && point.yakuman_count == 0{
+        if point.fan == 0 && point.yakuman_count == 0 {
             texts.push("錯和 役なし".to_string());
             return texts;
         }
@@ -229,14 +229,16 @@ impl TestMode {
             if self.finish.is_some() {
                 let pt = self.judge(true, 0, 0);
                 let pr = self.judge(false, 0, 0);
+                let ct = self.judge(true, 0, 3);
+                let cr = self.judge(false, 0, 3);
                 for (i, v) in self.judge_string.iter_mut().enumerate() {
                     v.clear();
 
                     let texts = match i {
                         0 => Self::create_judge_texts(&pt, true, true),
                         1 => Self::create_judge_texts(&pr, true, false),
-                        2 => Self::create_judge_texts(&pt, false, true),
-                        3 => Self::create_judge_texts(&pr, false, false),
+                        2 => Self::create_judge_texts(&ct, false, true),
+                        3 => Self::create_judge_texts(&cr, false, false),
                         _ => panic!(),
                     };
 
