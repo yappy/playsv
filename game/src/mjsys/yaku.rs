@@ -678,8 +678,12 @@ pub fn check_yakuman(hand: &FinishHand, param: &PointParam, menzen: bool) -> u32
             }
         }
     }
-    if let Some(_head) = hand.head {
-        // TODO: ryuiso
+    if let Some(head) = hand.head {
+        let yes1 = super::is_green(head).unwrap();
+        let yes2 = hand.mianzi_list.iter().all(|m| m.is_green());
+        if yes1 && yes2 {
+            yakuman |= Yakuman::RYUISO.0;
+        }
     }
     if let Some(head) = hand.head {
         let yes1 = super::is_yao(head).unwrap();
