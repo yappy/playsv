@@ -188,7 +188,7 @@ impl TestMode {
         }
 
         let point = point.as_ref().unwrap();
-        if point.fan == 0 && point.yakuman_count == 0{
+        if point.fan == 0 && point.yakuman_count == 0 {
             texts.push("錯和 役なし".to_string());
             return texts;
         }
