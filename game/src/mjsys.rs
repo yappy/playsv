@@ -85,6 +85,15 @@ pub fn is_tanyao(code: u8) -> Result<bool> {
     Ok(!is_yao(code)?)
 }
 
+pub fn is_green(code: u8) -> Result<bool> {
+    let (kind, num) = decode(code)?;
+
+    let b1 = (kind == KIND_S) && (num == 2 || num == 3 || num == 4 || num == 6 || num == 8);
+    let b2 = (kind == KIND_Z) && (num == 6);
+
+    Ok(b1 || b2)
+}
+
 pub fn to_human_readable_string(code: u8) -> Result<String> {
     let kind_char = ['m', 'p', 's', 'z'];
     let (kind, num) = decode(code)?;
@@ -304,6 +313,15 @@ impl Mianzi {
 
         self.mtype.is_same() && kind < 3 && (num == 1 || num == 9)
     }
+
+    pub fn is_green(&self) -> bool {
+        if self.mtype.is_ordered() {
+            // 2s
+            self.pai == OFFSET_S + 1
+        } else {
+            is_green(self.pai).unwrap()
+        }
+    }
 }
 
 // calc in progress
@@ -349,6 +367,14 @@ impl FinishType {
             FinishType::Ryanmen | FinishType::Shabo => 0,
             FinishType::Kanchan | FinishType::Penchan | FinishType::Tanki => 2,
         }
+    }
+
+    pub fn is_special(&self) -> bool {
+        matches!(self, FinishType::Chitoi | FinishType::Kokushi)
+    }
+
+    pub fn is_normal(&self) -> bool {
+        !self.is_special()
     }
 }
 
@@ -957,7 +983,10 @@ pub fn calc_base_point(hand: &FinishHand, param: &PointParam) -> Point {
     let yakuman = yaku::check_yakuman(hand, param, menzen);
     let yakuman_count = Yakuman::count_all(yakuman);
     let fu = calc_fu(hand, param, menzen);
-    if menzen && ((hand.tumo && fu == 20) || (!hand.tumo && fu == 30)) {
+    if menzen
+        && hand.finish_type.is_normal()
+        && ((hand.tumo && fu == 20) || (!hand.tumo && fu == 30))
+    {
         yaku |= yaku::Yaku::PINHU.0;
     }
 
