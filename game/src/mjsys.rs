@@ -35,6 +35,10 @@ pub const KIND_Z: u8 = 3;
 
 type Bucket = [u8; PAI_COUNT];
 
+pub fn empty_bucket() -> Bucket {
+    [0; PAI_COUNT]
+}
+
 fn validate(kind: u8, num: u8) -> Result<()> {
     ensure!(kind <= 3, "Invalid kind: {kind}");
     ensure!((1..=9).contains(&num), "Invalid num: {num}");
@@ -341,7 +345,7 @@ pub struct Hand {
 impl Default for Hand {
     fn default() -> Self {
         Self {
-            bucket: [0; PAI_COUNT],
+            bucket: empty_bucket(),
             mianzi_list: Default::default(),
             head: None,
             finish_pai: None,
