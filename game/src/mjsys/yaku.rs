@@ -775,7 +775,7 @@ mod tests {
         let mut bit = 1u64;
         while bit <= Yaku::END.0 {
             let j = Yaku(bit).to_japanese_str();
-            assert!(j.len() > 0);
+            assert!(!j.is_empty());
             bit <<= 1;
         }
     }
