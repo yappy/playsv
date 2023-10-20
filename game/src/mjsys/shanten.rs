@@ -30,7 +30,7 @@ pub fn kokushi(hand: &Hand) -> u32 {
     let mut dual = false;
     let mut count = 0;
     for pai in 0..PAI_COUNT_U8 {
-        if !super::is_yao(pai).unwrap() {
+        if !super::is_yao(pai) {
             continue;
         }
         if hand.bucket[pai as usize] >= 1 {

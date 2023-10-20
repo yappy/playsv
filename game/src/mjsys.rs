@@ -53,8 +53,7 @@ fn validate(kind: u8, num: u8) -> Result<()> {
     Ok(())
 }
 
-// returns (kind, number)
-pub fn decode(code: u8) -> Result<(u8, u8)> {
+pub fn decode_safe(code: u8) -> Result<(u8, u8)> {
     let kind = code / 9;
     let num = code % 9 + 1;
 
@@ -63,50 +62,59 @@ pub fn decode(code: u8) -> Result<(u8, u8)> {
     Ok((kind, num))
 }
 
-pub fn encode(kind: u8, num: u8) -> Result<u8> {
+// returns (kind, number)
+pub fn decode(code: u8) -> (u8, u8) {
+    decode_safe(code).unwrap()
+}
+
+pub fn encode_safe(kind: u8, num: u8) -> Result<u8> {
     validate(kind, num)?;
 
     Ok(kind * 9 + (num - 1))
 }
 
-pub fn is_ji(code: u8) -> Result<bool> {
-    let (kind, _num) = decode(code)?;
-
-    Ok(kind == KIND_Z)
+pub fn encode(kind: u8, num: u8) -> u8 {
+    encode_safe(kind, num).unwrap()
 }
 
-pub fn is_num(code: u8) -> Result<bool> {
-    Ok(!is_ji(code)?)
+pub fn is_ji(code: u8) -> bool {
+    let (kind, _num) = decode(code);
+
+    kind == KIND_Z
 }
 
-pub fn is_sangen(code: u8) -> Result<bool> {
-    let (kind, num) = decode(code)?;
-
-    Ok(kind == KIND_Z && (5..=7).contains(&num))
+pub fn is_num(code: u8) -> bool {
+    !is_ji(code)
 }
 
-pub fn is_yao(code: u8) -> Result<bool> {
-    let (kind, num) = decode(code)?;
+pub fn is_sangen(code: u8) -> bool {
+    let (kind, num) = decode(code);
 
-    Ok(kind == KIND_Z || num == 1 || num == 9)
+    kind == KIND_Z && (5..=7).contains(&num)
 }
 
-pub fn is_tanyao(code: u8) -> Result<bool> {
-    Ok(!is_yao(code)?)
+pub fn is_yao(code: u8) -> bool {
+    let (kind, num) = decode(code);
+
+    kind == KIND_Z || num == 1 || num == 9
 }
 
-pub fn is_green(code: u8) -> Result<bool> {
-    let (kind, num) = decode(code)?;
+pub fn is_tanyao(code: u8) -> bool {
+    !is_yao(code)
+}
+
+pub fn is_green(code: u8) -> bool {
+    let (kind, num) = decode(code);
 
     let b1 = (kind == KIND_S) && (num == 2 || num == 3 || num == 4 || num == 6 || num == 8);
     let b2 = (kind == KIND_Z) && (num == 6);
 
-    Ok(b1 || b2)
+    b1 || b2
 }
 
 pub fn to_human_readable_string(code: u8) -> Result<String> {
     let kind_char = ['m', 'p', 's', 'z'];
-    let (kind, num) = decode(code)?;
+    let (kind, num) = decode_safe(code)?;
 
     Ok(format!("{}{}", num, kind_char[kind as usize]))
 }
@@ -166,13 +174,13 @@ pub fn from_human_readable_string(src: &str) -> Result<Hand> {
                 match fulou {
                     None => {
                         for &num in num_list.iter() {
-                            let pai = encode(kind, num)?;
+                            let pai = encode_safe(kind, num)?;
                             pai_list.push(pai);
                         }
                     }
                     Some(mtype) => {
                         let num = *num_list.first().ok_or(anyhow!("Invalid fulou"))?;
-                        let pai = encode(kind, num)?;
+                        let pai = encode_safe(kind, num)?;
                         let m = Mianzi { mtype, pai };
                         hand.mianzi_list.push(m);
                     }
@@ -291,17 +299,15 @@ impl Mianzi {
     }
 
     pub fn color(&self) -> u8 {
-        let (kind, _num) = decode(self.pai).unwrap();
-
-        kind
+        decode(self.pai).0
     }
 
     pub fn is_tanyao(&self) -> bool {
         if self.mtype.is_ordered() {
-            let (_kind, num) = decode(self.pai).unwrap();
+            let (_kind, num) = decode(self.pai);
             num != 1 && num != 7
         } else {
-            is_tanyao(self.pai).unwrap()
+            is_tanyao(self.pai)
         }
     }
 
@@ -310,7 +316,7 @@ impl Mianzi {
     }
 
     pub fn is_junchan(&self) -> bool {
-        let (kind, num) = decode(self.pai).unwrap();
+        let (kind, num) = decode(self.pai);
         if self.mtype.is_ordered() {
             num == 1 || num == 7
         } else {
@@ -319,7 +325,7 @@ impl Mianzi {
     }
 
     pub fn is_chinro(&self) -> bool {
-        let (kind, num) = decode(self.pai).unwrap();
+        let (kind, num) = decode(self.pai);
 
         self.mtype.is_same() && kind < 3 && (num == 1 || num == 9)
     }
@@ -329,7 +335,7 @@ impl Mianzi {
             // 2s
             self.pai == OFFSET_S + 1
         } else {
-            is_green(self.pai).unwrap()
+            is_green(self.pai)
         }
     }
 }
@@ -642,7 +648,7 @@ fn finish_kokushi(hand: &Hand, result: &mut Vec<FinishHand>) -> Result<()> {
         return Ok(());
     }
     if let Some(fin) = hand.finish_pai {
-        if is_tanyao(fin)? {
+        if is_tanyao(fin) {
             return Ok(());
         }
     }
@@ -651,14 +657,14 @@ fn finish_kokushi(hand: &Hand, result: &mut Vec<FinishHand>) -> Result<()> {
     let mut have2: Option<u8> = None;
     for (pai, &count) in hand.bucket.iter().enumerate() {
         let pai = pai as u8;
-        if is_tanyao(pai)? {
+        if is_tanyao(pai) {
             if count > 0 {
                 return Ok(());
             } else {
                 continue;
             }
         }
-        debug_assert!(is_yao(pai)?);
+        debug_assert!(is_yao(pai));
         match count {
             0 => {
                 if wait.is_none() {
@@ -705,7 +711,7 @@ fn finish_kokushi(hand: &Hand, result: &mut Vec<FinishHand>) -> Result<()> {
         // rising sun
         if let Some(fin) = hand.finish_pai {
             // checked at first
-            debug_assert!(is_yao(fin)?);
+            debug_assert!(is_yao(fin));
             result.push(FinishHand {
                 finish_type: FinishType::Kokushi,
                 mianzi_list: Vec::new(),
@@ -715,7 +721,7 @@ fn finish_kokushi(hand: &Hand, result: &mut Vec<FinishHand>) -> Result<()> {
             });
         } else {
             for pai in 0..PAI_COUNT_U8 {
-                if is_yao(pai).unwrap() {
+                if is_yao(pai) {
                     result.push(FinishHand {
                         finish_type: FinishType::Kokushi,
                         mianzi_list: Vec::new(),
@@ -755,11 +761,11 @@ fn check_finish(pai1: u8, pai2: u8, finish_pai: u8, hand: &Hand) -> Option<Finis
     }
 
     // order finish
-    let (k1, n1) = decode(pai1).unwrap();
-    let (k2, n2) = decode(pai2).unwrap();
-    let (kf, nf) = decode(finish_pai).unwrap();
+    let (k1, n1) = decode(pai1);
+    let (k2, n2) = decode(pai2);
+    let (kf, nf) = decode(finish_pai);
     // (not ji) and (color is the same)
-    if is_ji(pai1).unwrap() {
+    if is_ji(pai1) {
         return None;
     }
     if k1 != k2 || k2 != kf {
@@ -890,7 +896,7 @@ fn finish_patterns(
         }
 
         let u8pai = pai as u8;
-        let (kind, num) = decode(u8pai)?;
+        let (kind, num) = decode(u8pai);
 
         if hand.bucket[pai] >= 3 {
             hand.bucket[pai] -= 3;
@@ -948,7 +954,7 @@ fn calc_fu(hand: &FinishHand, param: &PointParam, menzen: bool) -> u32 {
                 panic!("Must not reach");
             }
         };
-        if is_yao(m.pai).unwrap() {
+        if is_yao(m.pai) {
             tmp *= 2;
         }
         fu += tmp;
@@ -957,7 +963,7 @@ fn calc_fu(hand: &FinishHand, param: &PointParam, menzen: bool) -> u32 {
     {
         let mut tmp = 0;
         let head = hand.head.unwrap();
-        if is_sangen(head).unwrap() || head == param.self_wind_pi() {
+        if is_sangen(head) || head == param.self_wind_pi() {
             tmp += 2;
         }
         // NOTICE: by rule option
@@ -1054,8 +1060,8 @@ mod tests {
                 if k == 3 && n > 7 {
                     continue;
                 }
-                let enc = encode(k, n)?;
-                let (kk, nn) = decode(enc)?;
+                let enc = encode(k, n);
+                let (kk, nn) = decode(enc);
                 assert_eq!(k, kk);
                 assert_eq!(n, nn);
             }

@@ -97,7 +97,7 @@ impl TestMode {
             let mut x = X_INIT;
             let mut y = Y_INIT;
             for pai in 0..mjsys::PAI_COUNT_U8 {
-                let (kind, num) = mjsys::decode(pai).unwrap();
+                let (kind, num) = mjsys::decode(pai);
                 let img = &self.img_set.pai[kind as usize][num as usize - 1];
                 self.pai_list_hit.push(HitBox::from_image(img, x, y));
                 x += img.width();
@@ -117,7 +117,7 @@ impl TestMode {
 
         self.hand_hit.clear();
         for &pai in self.hand.iter() {
-            let (kind, num) = mjsys::decode(pai).unwrap();
+            let (kind, num) = mjsys::decode(pai);
             let img = &self.img_set.pai[kind as usize][num as usize - 1];
             self.hand_hit.push(HitBox::from_image(img, x, y));
             x += img.width();
@@ -125,7 +125,7 @@ impl TestMode {
 
         x += 10;
         if let Some(pai) = self.finish {
-            let (kind, num) = mjsys::decode(pai).unwrap();
+            let (kind, num) = mjsys::decode(pai);
             let img = &self.img_set.pai[kind as usize][num as usize - 1];
             self.finish_hit = Some(HitBox::from_image(img, x, y));
             x += img.width();
@@ -136,7 +136,7 @@ impl TestMode {
         x += 10;
         self.fulou_hit.clear();
         for &m in self.fulou.iter() {
-            let (kind, num) = mjsys::decode(m.pai).unwrap();
+            let (kind, num) = mjsys::decode(m.pai);
             let img = &self.img_set.pai[kind as usize][num as usize - 1];
             let mut hit = HitBox::from_image(img, x, y);
             hit.w *= 3;
@@ -278,7 +278,7 @@ impl TestMode {
         }
         // input list
         for (pai, hit) in self.pai_list_hit.iter().enumerate() {
-            let (kind, num) = mjsys::decode(pai as u8).unwrap();
+            let (kind, num) = mjsys::decode(pai as u8);
             let img = &self.img_set.pai[kind as usize][num as usize - 1];
 
             context
@@ -288,7 +288,7 @@ impl TestMode {
         // hand
         for (i, &pai) in self.hand.iter().enumerate() {
             let hit = &self.hand_hit[i];
-            let (kind, num) = mjsys::decode(pai).unwrap();
+            let (kind, num) = mjsys::decode(pai);
             let img = &self.img_set.pai[kind as usize][num as usize - 1];
 
             context
@@ -297,7 +297,7 @@ impl TestMode {
         }
         if let Some(pai) = self.finish {
             let hit = self.finish_hit.as_ref().unwrap();
-            let (kind, num) = mjsys::decode(pai).unwrap();
+            let (kind, num) = mjsys::decode(pai);
             let img = &self.img_set.pai[kind as usize][num as usize - 1];
 
             context
@@ -309,7 +309,7 @@ impl TestMode {
         context.set_fill_style(&"black".to_string().into());
         for (i, &m) in self.fulou.iter().enumerate() {
             let hit = &self.fulou_hit[i];
-            let (kind, num) = mjsys::decode(m.pai).unwrap();
+            let (kind, num) = mjsys::decode(m.pai);
 
             let mut x = hit.x;
             for k in 0..3 {
@@ -372,7 +372,7 @@ impl TestMode {
                 bucket[pai as usize] += 1;
             }
             Self::INPUT_CHI => {
-                let (kind, num) = mjsys::decode(pai).unwrap();
+                let (kind, num) = mjsys::decode(pai);
                 if kind >= mjsys::KIND_Z || num > 7 {
                     return;
                 }

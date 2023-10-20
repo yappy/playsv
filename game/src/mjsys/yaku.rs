@@ -290,7 +290,7 @@ pub fn check_yaku(hand: &FinishHand, param: &PointParam, menzen: bool) -> u64 {
     {
         let tan1 = hand.mianzi_list.iter().all(|m| m.is_tanyao());
         let tan2 = if let Some(head) = hand.head {
-            super::is_tanyao(head).unwrap()
+            super::is_tanyao(head)
         } else {
             true
         };
@@ -369,8 +369,8 @@ pub fn check_yaku(hand: &FinishHand, param: &PointParam, menzen: bool) -> u64 {
     {
         let mut exist: [u8; 7] = Default::default();
         for m in hand.mianzi_list.iter() {
-            if !super::is_ji(m.pai).unwrap() && m.mtype.is_ordered() {
-                let (kind, num) = super::decode(m.pai).unwrap();
+            if !super::is_ji(m.pai) && m.mtype.is_ordered() {
+                let (kind, num) = super::decode(m.pai);
                 let num = num - 1;
                 exist[num as usize] |= 1 << kind;
             }
@@ -386,8 +386,8 @@ pub fn check_yaku(hand: &FinishHand, param: &PointParam, menzen: bool) -> u64 {
     {
         let mut exist: [[bool; 7]; 3] = Default::default();
         for m in hand.mianzi_list.iter() {
-            if !super::is_ji(m.pai).unwrap() && m.mtype.is_ordered() {
-                let (kind, num) = super::decode(m.pai).unwrap();
+            if !super::is_ji(m.pai) && m.mtype.is_ordered() {
+                let (kind, num) = super::decode(m.pai);
                 let num = num - 1;
                 exist[kind as usize][num as usize] = true;
             }
@@ -403,7 +403,7 @@ pub fn check_yaku(hand: &FinishHand, param: &PointParam, menzen: bool) -> u64 {
     {
         let yes1 = hand.mianzi_list.iter().all(|m| m.is_chanta());
         let yes2 = if let Some(head) = hand.head {
-            super::is_yao(head).unwrap()
+            super::is_yao(head)
         } else {
             true
         };
@@ -440,7 +440,7 @@ pub fn check_yaku(hand: &FinishHand, param: &PointParam, menzen: bool) -> u64 {
             .iter()
             .all(|m| (m.mtype.is_same() || m.mtype.is_chitoi()) && m.is_chanta());
         let yes2 = if let Some(head) = hand.head {
-            super::is_yao(head).unwrap()
+            super::is_yao(head)
         } else {
             true
         };
@@ -451,8 +451,8 @@ pub fn check_yaku(hand: &FinishHand, param: &PointParam, menzen: bool) -> u64 {
     {
         let mut exist: [u8; 9] = Default::default();
         for m in hand.mianzi_list.iter() {
-            if !super::is_ji(m.pai).unwrap() && m.mtype.is_same() {
-                let (kind, num) = super::decode(m.pai).unwrap();
+            if !super::is_ji(m.pai) && m.mtype.is_same() {
+                let (kind, num) = super::decode(m.pai);
                 let num = num - 1;
                 exist[num as usize] |= 1 << kind;
             }
@@ -491,12 +491,8 @@ pub fn check_yaku(hand: &FinishHand, param: &PointParam, menzen: bool) -> u64 {
     {
         let mut yes = true;
         let mut color: Option<u8> = None;
-        for m in hand
-            .mianzi_list
-            .iter()
-            .filter(|m| !super::is_ji(m.pai).unwrap())
-        {
-            let (kind, _num) = super::decode(m.pai).unwrap();
+        for m in hand.mianzi_list.iter().filter(|m| !super::is_ji(m.pai)) {
+            let (kind, _num) = super::decode(m.pai);
             if color.is_some() && color != Some(kind) {
                 yes = false;
                 break;
@@ -505,8 +501,8 @@ pub fn check_yaku(hand: &FinishHand, param: &PointParam, menzen: bool) -> u64 {
             }
         }
         if let Some(head) = hand.head {
-            if !super::is_ji(head).unwrap() {
-                let (kind, _num) = super::decode(head).unwrap();
+            if !super::is_ji(head) {
+                let (kind, _num) = super::decode(head);
                 if color != Some(kind) {
                     yes = false;
                 }
@@ -523,7 +519,7 @@ pub fn check_yaku(hand: &FinishHand, param: &PointParam, menzen: bool) -> u64 {
     {
         let yes1 = hand.mianzi_list.iter().all(|m| m.is_junchan());
         let yes2 = if let Some(head) = hand.head {
-            super::is_yao(head).unwrap()
+            super::is_yao(head)
         } else {
             // chitoi
             true
@@ -565,7 +561,7 @@ pub fn check_yaku(hand: &FinishHand, param: &PointParam, menzen: bool) -> u64 {
         if color != super::KIND_Z {
             let yes1 = hand.mianzi_list.iter().all(|m| m.color() == color);
             let yes2 = if let Some(head) = hand.head {
-                color == decode(head).unwrap().0
+                color == decode(head).0
             } else {
                 true
             };
@@ -638,12 +634,9 @@ pub fn check_yakuman(hand: &FinishHand, param: &PointParam, menzen: bool) -> u32
         }
     }
     {
-        let yes1 = hand
-            .mianzi_list
-            .iter()
-            .all(|m| super::is_ji(m.pai).unwrap());
+        let yes1 = hand.mianzi_list.iter().all(|m| super::is_ji(m.pai));
         let yes2 = if let Some(head) = hand.head {
-            super::is_ji(head).unwrap()
+            super::is_ji(head)
         } else {
             // chitoi
             true
@@ -679,14 +672,14 @@ pub fn check_yakuman(hand: &FinishHand, param: &PointParam, menzen: bool) -> u32
         }
     }
     if let Some(head) = hand.head {
-        let yes1 = super::is_green(head).unwrap();
+        let yes1 = super::is_green(head);
         let yes2 = hand.mianzi_list.iter().all(|m| m.is_green());
         if yes1 && yes2 {
             yakuman |= Yakuman::RYUISO.0;
         }
     }
     if let Some(head) = hand.head {
-        let yes1 = super::is_yao(head).unwrap();
+        let yes1 = super::is_yao(head);
         let yes2 = hand.mianzi_list.iter().all(|m| m.is_chinro());
         if yes1 && yes2 {
             yakuman |= Yakuman::CHINROTO.0;
@@ -714,7 +707,7 @@ pub fn check_yakuman(hand: &FinishHand, param: &PointParam, menzen: bool) -> u32
                 let mut one_more = false;
                 let req_table = [0, 3, 1, 1, 1, 1, 1, 1, 1, 3];
                 for num in 1u8..=9u8 {
-                    let pai = super::encode(kind, num).unwrap();
+                    let pai = super::encode(kind, num);
                     let has = bucket[pai as usize];
                     let req = req_table[num as usize];
                     if has >= req {
@@ -790,19 +783,19 @@ mod tests {
             mianzi_list: vec![
                 Mianzi {
                     mtype: MianziType::Ordered,
-                    pai: encode(0, 2).unwrap(),
+                    pai: encode(0, 2),
                 },
                 Mianzi {
                     mtype: MianziType::Ordered,
-                    pai: encode(0, 2).unwrap(),
+                    pai: encode(0, 2),
                 },
                 Mianzi {
                     mtype: MianziType::Ordered,
-                    pai: encode(1, 4).unwrap(),
+                    pai: encode(1, 4),
                 },
                 Mianzi {
                     mtype: MianziType::Ordered,
-                    pai: encode(2, 6).unwrap(),
+                    pai: encode(2, 6),
                 },
             ],
             // 88m
