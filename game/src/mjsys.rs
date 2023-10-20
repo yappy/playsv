@@ -33,6 +33,8 @@ pub const KIND_P: u8 = 1;
 pub const KIND_S: u8 = 2;
 pub const KIND_Z: u8 = 3;
 
+type Bucket = [u8; PAI_COUNT];
+
 fn validate(kind: u8, num: u8) -> Result<()> {
     ensure!(kind <= 3, "Invalid kind: {kind}");
     ensure!((1..=9).contains(&num), "Invalid num: {num}");
@@ -261,7 +263,7 @@ pub struct Mianzi {
 }
 
 impl Mianzi {
-    pub fn to_bucket(&self, dst: &mut [u8; PAI_COUNT]) {
+    pub fn to_bucket(&self, dst: &mut Bucket) {
         match self.mtype {
             MianziType::Ordered | MianziType::OrderedChi => {
                 dst[self.pai as usize] += 1;
@@ -328,7 +330,7 @@ impl Mianzi {
 #[derive(Debug, Clone)]
 pub struct Hand {
     // pai count = bucket[encoded_pai]
-    pub bucket: [u8; PAI_COUNT],
+    pub bucket: Bucket,
     pub mianzi_list: Vec<Mianzi>,
     pub head: Option<u8>,
     // search all if None
@@ -547,7 +549,7 @@ impl PointParam {
     }
 }
 
-pub fn to_bucket(dst: &mut [u8; PAI_COUNT], src: &[u8]) {
+pub fn to_bucket(dst: &mut Bucket, src: &[u8]) {
     for &pai in src {
         dst[pai as usize] += 1;
     }
