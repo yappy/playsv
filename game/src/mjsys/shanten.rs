@@ -72,6 +72,7 @@ pub fn chitoi(hand: &Hand) -> u32 {
 
 fn all_pattern(bucket: &mut Bucket, men: u32, ta: u32, start: u8) -> u32 {
     debug_assert!(men <= 4);
+    // calculate the current value
     let mut val = men * 2 + ta.min(4 - men);
 
     for pai in start..PAI_COUNT_U8 {
@@ -118,6 +119,7 @@ fn all_pattern(bucket: &mut Bucket, men: u32, ta: u32, start: u8) -> u32 {
         }
     }
 
+    // return the max value
     val
 }
 
@@ -192,16 +194,25 @@ mod tests {
         Ok(())
     }
 
-    fn process_line(nums: &[i8], filename: &str, lineno: usize) {
+    #[derive(Debug, Clone, Copy)]
+    enum ShantenType {
+        Normal,
+        Kokushi,
+        Chitoi,
+    }
+
+    fn process_line(nums: &[i8], stype: ShantenType, filename: &str, lineno: usize) {
         let hand14 = &nums[0..14];
         // if agari, -1: for all hand13, shanten = 0
-        let exp_n = nums[14].max(0) as u32;
-        let exp_k = nums[15].max(0) as u32;
-        let exp_c = nums[16].max(0) as u32;
+        let exp_ind = match stype {
+            ShantenType::Normal => 14,
+            ShantenType::Kokushi => 15,
+            ShantenType::Chitoi => 16,
+        };
+        let exp = nums[exp_ind].max(0) as u32;
 
-        let mut n_min = u32::MAX;
-        let mut k_min = u32::MAX;
-        let mut c_min = u32::MAX;
+        // remove one and take the minimum value
+        let mut sol = u32::MAX;
         for del in 0..14 {
             let mut hand: Hand = Default::default();
             for i in 0..14 {
@@ -209,16 +220,17 @@ mod tests {
                     hand.bucket[hand14[i] as usize] += 1;
                 }
             }
-            n_min = normal(&hand).min(n_min);
-            k_min = kokushi(&hand).min(k_min);
-            c_min = chitoi(&hand).min(c_min);
+            sol = match stype {
+                ShantenType::Normal => normal(&hand),
+                ShantenType::Kokushi => kokushi(&hand),
+                ShantenType::Chitoi => chitoi(&hand),
+            }
+            .min(sol);
         }
-        assert_eq!(exp_n, n_min, "{filename}:{lineno}");
-        assert_eq!(exp_k, k_min, "{filename}:{lineno}");
-        assert_eq!(exp_c, c_min, "{filename}:{lineno}");
+        assert_eq!(exp, sol, "{filename}:{lineno}:{:?}", stype);
     }
 
-    fn process_file(filename: &str) -> Result<()> {
+    fn process_file(filename: &str, stype: ShantenType) -> Result<()> {
         let path: PathBuf = [env!("CARGO_MANIFEST_DIR"), "testres", filename]
             .iter()
             .collect();
@@ -228,29 +240,64 @@ mod tests {
                 .enumerate()
                 .for_each(|(i, tok)| nums[i] = tok.parse::<i8>().unwrap());
 
-            process_line(&nums, filename, no + 1)
+            process_line(&nums, stype, filename, no + 1)
         }
 
         Ok(())
     }
 
     #[test]
-    fn heavy_normal() -> Result<()> {
-        process_file("p_normal_10000.txt")
+    fn heavy_normal_n() -> Result<()> {
+        process_file("p_normal_10000.txt", ShantenType::Normal)
+    }
+    #[test]
+    fn heavy_normal_k() -> Result<()> {
+        process_file("p_normal_10000.txt", ShantenType::Kokushi)
+    }
+    #[test]
+    fn heavy_normal_c() -> Result<()> {
+        process_file("p_normal_10000.txt", ShantenType::Chitoi)
     }
 
     #[test]
-    fn heavy_hon() -> Result<()> {
-        process_file("p_hon_10000.txt")
+    fn heavy_hon_n() -> Result<()> {
+        process_file("p_hon_10000.txt", ShantenType::Normal)
+    }
+    #[test]
+    fn heavy_hon_k() -> Result<()> {
+        process_file("p_hon_10000.txt", ShantenType::Kokushi)
+    }
+    #[test]
+    fn heavy_hon_c() -> Result<()> {
+        process_file("p_hon_10000.txt", ShantenType::Chitoi)
+    }
+
+    // cargo test -- --ignored
+    // cargo test -- --include-ignored
+    #[test]
+    #[ignore]
+    fn heavy_tin_n() -> Result<()> {
+        process_file("p_tin_10000.txt", ShantenType::Normal)
+    }
+    #[test]
+    fn heavy_tin_k() -> Result<()> {
+        process_file("p_tin_10000.txt", ShantenType::Kokushi)
+    }
+    #[test]
+    fn heavy_tin_c() -> Result<()> {
+        process_file("p_tin_10000.txt", ShantenType::Chitoi)
     }
 
     #[test]
-    fn heavy_tin() -> Result<()> {
-        process_file("p_tin_10000.txt")
+    fn heavy_koku_n() -> Result<()> {
+        process_file("p_koku_10000.txt", ShantenType::Normal)
     }
-
     #[test]
-    fn heavy_koku() -> Result<()> {
-        process_file("p_koku_10000.txt")
+    fn heavy_koku_k() -> Result<()> {
+        process_file("p_koku_10000.txt", ShantenType::Kokushi)
+    }
+    #[test]
+    fn heavy_koku_c() -> Result<()> {
+        process_file("p_koku_10000.txt", ShantenType::Chitoi)
     }
 }
