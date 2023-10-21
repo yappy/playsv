@@ -201,12 +201,12 @@ impl GameState {
                 for kind in 0..3 {
                     // 1-9
                     for num in 1..=9 {
-                        yama_tmp.push(mjsys::encode(kind, num).unwrap() as i32);
+                        yama_tmp.push(mjsys::encode(kind, num) as i32);
                     }
                 }
                 // zu: 3
                 for num in 1..=7 {
-                    yama_tmp.push(mjsys::encode(3, num).unwrap() as i32);
+                    yama_tmp.push(mjsys::encode(3, num) as i32);
                 }
             }
             // thread_local cryptographically secure PRNG

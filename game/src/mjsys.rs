@@ -12,9 +12,9 @@ Encoding:
 ji   : 27-33
 */
 
+pub mod shanten;
 pub mod yaku;
 
-use anyhow::Ok;
 use anyhow::{anyhow, bail, ensure, Result};
 use yaku::Yaku;
 use yaku::Yakuman;
@@ -33,6 +33,16 @@ pub const KIND_P: u8 = 1;
 pub const KIND_S: u8 = 2;
 pub const KIND_Z: u8 = 3;
 
+type Bucket = [u8; PAI_COUNT];
+
+pub fn empty_bucket() -> Bucket {
+    [0; PAI_COUNT]
+}
+
+pub fn bucket_count(bucket: &Bucket) -> u32 {
+    bucket.iter().fold(0, |sum, &c| sum + c as u32)
+}
+
 fn validate(kind: u8, num: u8) -> Result<()> {
     ensure!(kind <= 3, "Invalid kind: {kind}");
     ensure!((1..=9).contains(&num), "Invalid num: {num}");
@@ -43,8 +53,7 @@ fn validate(kind: u8, num: u8) -> Result<()> {
     Ok(())
 }
 
-// returns (kind, number)
-pub fn decode(code: u8) -> Result<(u8, u8)> {
+pub fn decode_safe(code: u8) -> Result<(u8, u8)> {
     let kind = code / 9;
     let num = code % 9 + 1;
 
@@ -53,50 +62,59 @@ pub fn decode(code: u8) -> Result<(u8, u8)> {
     Ok((kind, num))
 }
 
-pub fn encode(kind: u8, num: u8) -> Result<u8> {
+// returns (kind, number)
+pub fn decode(code: u8) -> (u8, u8) {
+    decode_safe(code).unwrap()
+}
+
+pub fn encode_safe(kind: u8, num: u8) -> Result<u8> {
     validate(kind, num)?;
 
     Ok(kind * 9 + (num - 1))
 }
 
-pub fn is_ji(code: u8) -> Result<bool> {
-    let (kind, _num) = decode(code)?;
-
-    Ok(kind == KIND_Z)
+pub fn encode(kind: u8, num: u8) -> u8 {
+    encode_safe(kind, num).unwrap()
 }
 
-pub fn is_num(code: u8) -> Result<bool> {
-    Ok(!is_ji(code)?)
+pub fn is_ji(code: u8) -> bool {
+    let (kind, _num) = decode(code);
+
+    kind == KIND_Z
 }
 
-pub fn is_sangen(code: u8) -> Result<bool> {
-    let (kind, num) = decode(code)?;
-
-    Ok(kind == KIND_Z && (5..=7).contains(&num))
+pub fn is_num(code: u8) -> bool {
+    !is_ji(code)
 }
 
-pub fn is_yao(code: u8) -> Result<bool> {
-    let (kind, num) = decode(code)?;
+pub fn is_sangen(code: u8) -> bool {
+    let (kind, num) = decode(code);
 
-    Ok(kind == KIND_Z || num == 1 || num == 9)
+    kind == KIND_Z && (5..=7).contains(&num)
 }
 
-pub fn is_tanyao(code: u8) -> Result<bool> {
-    Ok(!is_yao(code)?)
+pub fn is_yao(code: u8) -> bool {
+    let (kind, num) = decode(code);
+
+    kind == KIND_Z || num == 1 || num == 9
 }
 
-pub fn is_green(code: u8) -> Result<bool> {
-    let (kind, num) = decode(code)?;
+pub fn is_tanyao(code: u8) -> bool {
+    !is_yao(code)
+}
+
+pub fn is_green(code: u8) -> bool {
+    let (kind, num) = decode(code);
 
     let b1 = (kind == KIND_S) && (num == 2 || num == 3 || num == 4 || num == 6 || num == 8);
     let b2 = (kind == KIND_Z) && (num == 6);
 
-    Ok(b1 || b2)
+    b1 || b2
 }
 
 pub fn to_human_readable_string(code: u8) -> Result<String> {
     let kind_char = ['m', 'p', 's', 'z'];
-    let (kind, num) = decode(code)?;
+    let (kind, num) = decode_safe(code)?;
 
     Ok(format!("{}{}", num, kind_char[kind as usize]))
 }
@@ -156,13 +174,13 @@ pub fn from_human_readable_string(src: &str) -> Result<Hand> {
                 match fulou {
                     None => {
                         for &num in num_list.iter() {
-                            let pai = encode(kind, num)?;
+                            let pai = encode_safe(kind, num)?;
                             pai_list.push(pai);
                         }
                     }
                     Some(mtype) => {
                         let num = *num_list.first().ok_or(anyhow!("Invalid fulou"))?;
-                        let pai = encode(kind, num)?;
+                        let pai = encode_safe(kind, num)?;
                         let m = Mianzi { mtype, pai };
                         hand.mianzi_list.push(m);
                     }
@@ -261,7 +279,7 @@ pub struct Mianzi {
 }
 
 impl Mianzi {
-    pub fn to_bucket(&self, dst: &mut [u8; PAI_COUNT]) {
+    pub fn to_bucket(&self, dst: &mut Bucket) {
         match self.mtype {
             MianziType::Ordered | MianziType::OrderedChi => {
                 dst[self.pai as usize] += 1;
@@ -281,17 +299,15 @@ impl Mianzi {
     }
 
     pub fn color(&self) -> u8 {
-        let (kind, _num) = decode(self.pai).unwrap();
-
-        kind
+        decode(self.pai).0
     }
 
     pub fn is_tanyao(&self) -> bool {
         if self.mtype.is_ordered() {
-            let (_kind, num) = decode(self.pai).unwrap();
+            let (_kind, num) = decode(self.pai);
             num != 1 && num != 7
         } else {
-            is_tanyao(self.pai).unwrap()
+            is_tanyao(self.pai)
         }
     }
 
@@ -300,7 +316,7 @@ impl Mianzi {
     }
 
     pub fn is_junchan(&self) -> bool {
-        let (kind, num) = decode(self.pai).unwrap();
+        let (kind, num) = decode(self.pai);
         if self.mtype.is_ordered() {
             num == 1 || num == 7
         } else {
@@ -309,7 +325,7 @@ impl Mianzi {
     }
 
     pub fn is_chinro(&self) -> bool {
-        let (kind, num) = decode(self.pai).unwrap();
+        let (kind, num) = decode(self.pai);
 
         self.mtype.is_same() && kind < 3 && (num == 1 || num == 9)
     }
@@ -319,7 +335,7 @@ impl Mianzi {
             // 2s
             self.pai == OFFSET_S + 1
         } else {
-            is_green(self.pai).unwrap()
+            is_green(self.pai)
         }
     }
 }
@@ -328,7 +344,7 @@ impl Mianzi {
 #[derive(Debug, Clone)]
 pub struct Hand {
     // pai count = bucket[encoded_pai]
-    pub bucket: [u8; PAI_COUNT],
+    pub bucket: Bucket,
     pub mianzi_list: Vec<Mianzi>,
     pub head: Option<u8>,
     // search all if None
@@ -339,7 +355,7 @@ pub struct Hand {
 impl Default for Hand {
     fn default() -> Self {
         Self {
-            bucket: [0; PAI_COUNT],
+            bucket: empty_bucket(),
             mianzi_list: Default::default(),
             head: None,
             finish_pai: None,
@@ -547,7 +563,7 @@ impl PointParam {
     }
 }
 
-pub fn to_bucket(dst: &mut [u8; PAI_COUNT], src: &[u8]) {
+pub fn to_bucket(dst: &mut Bucket, src: &[u8]) {
     for &pai in src {
         dst[pai as usize] += 1;
     }
@@ -632,7 +648,7 @@ fn finish_kokushi(hand: &Hand, result: &mut Vec<FinishHand>) -> Result<()> {
         return Ok(());
     }
     if let Some(fin) = hand.finish_pai {
-        if is_tanyao(fin)? {
+        if is_tanyao(fin) {
             return Ok(());
         }
     }
@@ -641,14 +657,14 @@ fn finish_kokushi(hand: &Hand, result: &mut Vec<FinishHand>) -> Result<()> {
     let mut have2: Option<u8> = None;
     for (pai, &count) in hand.bucket.iter().enumerate() {
         let pai = pai as u8;
-        if is_tanyao(pai)? {
+        if is_tanyao(pai) {
             if count > 0 {
                 return Ok(());
             } else {
                 continue;
             }
         }
-        debug_assert!(is_yao(pai)?);
+        debug_assert!(is_yao(pai));
         match count {
             0 => {
                 if wait.is_none() {
@@ -695,7 +711,7 @@ fn finish_kokushi(hand: &Hand, result: &mut Vec<FinishHand>) -> Result<()> {
         // rising sun
         if let Some(fin) = hand.finish_pai {
             // checked at first
-            debug_assert!(is_yao(fin)?);
+            debug_assert!(is_yao(fin));
             result.push(FinishHand {
                 finish_type: FinishType::Kokushi,
                 mianzi_list: Vec::new(),
@@ -705,7 +721,7 @@ fn finish_kokushi(hand: &Hand, result: &mut Vec<FinishHand>) -> Result<()> {
             });
         } else {
             for pai in 0..PAI_COUNT_U8 {
-                if is_yao(pai).unwrap() {
+                if is_yao(pai) {
                     result.push(FinishHand {
                         finish_type: FinishType::Kokushi,
                         mianzi_list: Vec::new(),
@@ -745,11 +761,11 @@ fn check_finish(pai1: u8, pai2: u8, finish_pai: u8, hand: &Hand) -> Option<Finis
     }
 
     // order finish
-    let (k1, n1) = decode(pai1).unwrap();
-    let (k2, n2) = decode(pai2).unwrap();
-    let (kf, nf) = decode(finish_pai).unwrap();
+    let (k1, n1) = decode(pai1);
+    let (k2, n2) = decode(pai2);
+    let (kf, nf) = decode(finish_pai);
     // (not ji) and (color is the same)
-    if is_ji(pai1).unwrap() {
+    if is_ji(pai1) {
         return None;
     }
     if k1 != k2 || k2 != kf {
@@ -880,7 +896,7 @@ fn finish_patterns(
         }
 
         let u8pai = pai as u8;
-        let (kind, num) = decode(u8pai)?;
+        let (kind, num) = decode(u8pai);
 
         if hand.bucket[pai] >= 3 {
             hand.bucket[pai] -= 3;
@@ -938,7 +954,7 @@ fn calc_fu(hand: &FinishHand, param: &PointParam, menzen: bool) -> u32 {
                 panic!("Must not reach");
             }
         };
-        if is_yao(m.pai).unwrap() {
+        if is_yao(m.pai) {
             tmp *= 2;
         }
         fu += tmp;
@@ -947,7 +963,7 @@ fn calc_fu(hand: &FinishHand, param: &PointParam, menzen: bool) -> u32 {
     {
         let mut tmp = 0;
         let head = hand.head.unwrap();
-        if is_sangen(head).unwrap() || head == param.self_wind_pi() {
+        if is_sangen(head) || head == param.self_wind_pi() {
             tmp += 2;
         }
         // NOTICE: by rule option
@@ -1044,8 +1060,8 @@ mod tests {
                 if k == 3 && n > 7 {
                     continue;
                 }
-                let enc = encode(k, n)?;
-                let (kk, nn) = decode(enc)?;
+                let enc = encode(k, n);
+                let (kk, nn) = decode(enc);
                 assert_eq!(k, kk);
                 assert_eq!(n, nn);
             }
@@ -1058,25 +1074,21 @@ mod tests {
         let fan_list: [u32; 4] = [1, 2, 3, 4];
         let fu_list: [u32; 11] = [20, 25, 30, 40, 50, 60, 70, 80, 90, 100, 110];
         let p_ron: [[u32; 11]; 4] = [
+            [0, 0, 1500, 2000, 2400, 2900, 3400, 3900, 4400, 4800, 5300],
             [
-                0___, 0___, 1500, 2000, 2400, 2900, 3400, 3900, 4400, 4800, 5300,
+                0, 2400, 2900, 3900, 4800, 5800, 6800, 7700, 8700, 9600, 10600,
             ],
             [
-                0___, 2400, 2900, 3900, 4800, 5800, 6800, 7700, 8700, 9600, 10600,
+                0, 4800, 5800, 7700, 9600, 11600, 12000, 12000, 12000, 12000, 12000,
             ],
             [
-                0___, 4800, 5800, 7700, 9600, 11600, 12000, 12000, 12000, 12000, 12000,
-            ],
-            [
-                0___, 9600, 11600, 12000, 12000, 12000, 12000, 12000, 12000, 12000, 12000,
+                0, 9600, 11600, 12000, 12000, 12000, 12000, 12000, 12000, 12000, 12000,
             ],
         ];
         let p_tumo: [[u32; 11]; 4] = [
+            [0, 0, 500, 700, 800, 1000, 1200, 1300, 1500, 1600, 1800],
             [
-                0___, 0___, 500_, 700_, 800_, 1000, 1200, 1300, 1500, 1600, 1800,
-            ],
-            [
-                700_, 800_, 1000, 1300, 1600, 2000, 2300, 2600, 2900, 3200, 3600,
+                700, 800, 1000, 1300, 1600, 2000, 2300, 2600, 2900, 3200, 3600,
             ],
             [
                 1300, 1600, 2000, 2600, 3200, 3900, 4000, 4000, 4000, 4000, 4000,
@@ -1086,17 +1098,15 @@ mod tests {
             ],
         ];
         let c_ron: [[u32; 11]; 4] = [
+            [0, 0, 1000, 1300, 1600, 2000, 2300, 2600, 2900, 3200, 3600],
             [
-                0___, 0___, 1000, 1300, 1600, 2000, 2300, 2600, 2900, 3200, 3600,
+                0, 1600, 2000, 2600, 3200, 3900, 4500, 5200, 5800, 6400, 7100,
             ],
             [
-                0___, 1600, 2000, 2600, 3200, 3900, 4500, 5200, 5800, 6400, 7100,
+                0, 3200, 3900, 5200, 6400, 7700, 8000, 8000, 8000, 8000, 8000,
             ],
             [
-                0___, 3200, 3900, 5200, 6400, 7700, 8000, 8000, 8000, 8000, 8000,
-            ],
-            [
-                0___, 6400, 7700, 8000, 8000, 8000, 8000, 8000, 8000, 8000, 8000,
+                0, 6400, 7700, 8000, 8000, 8000, 8000, 8000, 8000, 8000, 8000,
             ],
         ];
         let c_tumo: [[(u32, u32); 11]; 4] = [
@@ -1114,11 +1124,11 @@ mod tests {
                 (900, 1800),
             ],
             [
-                (400_, 700),
-                (400_, 800),
-                (500_, 1000),
-                (700_, 1300),
-                (800_, 1600),
+                (400, 700),
+                (400, 800),
+                (500, 1000),
+                (700, 1300),
+                (800, 1600),
                 (1000, 2000),
                 (1200, 2300),
                 (1300, 2600),
@@ -1127,8 +1137,8 @@ mod tests {
                 (1800, 3600),
             ],
             [
-                (700_, 1300),
-                (800_, 1600),
+                (700, 1300),
+                (800, 1600),
                 (1000, 2000),
                 (1300, 2600),
                 (1600, 3200),

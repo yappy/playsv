@@ -1,0 +1,24 @@
+name: Rust Long Run Test
+
+on: [push, pull_request]
+
+env:
+  # treat warnings as error
+  RUSTFLAGS: "-Dwarnings"
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-debug:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: jetli/trunk-action@v0.4.0
+        with:
+          version: 'latest'
+
+      - name: Tools
+        run: |
+          rustup target add wasm32-unknown-unknown
+
+      - name: Test
+        run: cargo test --release -- --include-ignored

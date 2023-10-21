@@ -152,10 +152,11 @@ where
             context.save();
             app.render(&context, self.canvas_w, self.canvas_h);
             context.restore();
-
-            // TODO animationFrame would be better
-            self.flip();
         }
+    }
+
+    fn on_animation_frame(&mut self) {
+        self.flip();
     }
 
     fn on_keydown(&mut self, event: &KeyboardEvent) {
@@ -266,6 +267,26 @@ where
             )
             .unwrap();
         cb.forget();
+
+        // window.requestAnimationFrame()
+        type Cb = Closure<dyn FnMut()>;
+        let pcb: Rc<RefCell<Option<Cb>>> = Rc::new(RefCell::new(None));
+        let pcb_move = pcb.clone();
+        let basesys_move = basesys.clone();
+        *pcb.borrow_mut() = Some(Closure::<dyn FnMut()>::new(move || {
+            if !is_panic() {
+                basesys_move.borrow_mut().on_animation_frame();
+                web_sys::window()
+                    .unwrap()
+                    .request_animation_frame(
+                        pcb_move.borrow().as_ref().unwrap().as_ref().unchecked_ref(),
+                    )
+                    .unwrap();
+            }
+        }));
+        let _id = window
+            .request_animation_frame(pcb.borrow().as_ref().unwrap().as_ref().unchecked_ref())
+            .unwrap();
 
         // front_canvas.addEventListener("keydown")
         let cb = {
