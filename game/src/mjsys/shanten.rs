@@ -246,7 +246,10 @@ mod tests {
         Ok(())
     }
 
+    // cargo test --release -- --ignored
+    // cargo test --release --include-ignored
     #[test]
+    #[ignore]
     fn heavy_normal_n() -> Result<()> {
         process_file("p_normal_10000.txt", ShantenType::Normal)
     }
@@ -259,7 +262,10 @@ mod tests {
         process_file("p_normal_10000.txt", ShantenType::Chitoi)
     }
 
+    // cargo test --release -- --ignored
+    // cargo test --release --include-ignored
     #[test]
+    #[ignore]
     fn heavy_hon_n() -> Result<()> {
         process_file("p_hon_10000.txt", ShantenType::Normal)
     }
@@ -288,7 +294,10 @@ mod tests {
         process_file("p_tin_10000.txt", ShantenType::Chitoi)
     }
 
+    // cargo test --release -- --ignored
+    // cargo test --release --include-ignored
     #[test]
+    #[ignore]
     fn heavy_koku_n() -> Result<()> {
         process_file("p_koku_10000.txt", ShantenType::Normal)
     }
