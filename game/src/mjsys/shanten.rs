@@ -6,10 +6,10 @@ fn hand_check(hand: &Hand) {
     let count = super::bucket_count(&hand.bucket);
     let fulou = hand.mianzi_list.len() as u32 * 3;
 
-    assert!(count + fulou == 13);
+    assert_eq!(13, count + fulou);
 }
 
-pub fn all(hand: &Hand) -> u32 {
+pub fn all(hand: &Hand) -> u8 {
     let s1 = kokushi(hand);
     if s1 == 0 {
         return 0;
@@ -23,10 +23,10 @@ pub fn all(hand: &Hand) -> u32 {
     s1.min(s2).min(s3)
 }
 
-pub fn kokushi(hand: &Hand) -> u32 {
+pub fn kokushi(hand: &Hand) -> u8 {
     hand_check(hand);
     if !hand.mianzi_list.is_empty() {
-        return u32::MAX;
+        return u8::MAX;
     }
 
     let mut dual = false;
@@ -48,10 +48,10 @@ pub fn kokushi(hand: &Hand) -> u32 {
     13 - count
 }
 
-pub fn chitoi(hand: &Hand) -> u32 {
+pub fn chitoi(hand: &Hand) -> u8 {
     hand_check(hand);
     if !hand.mianzi_list.is_empty() {
-        return u32::MAX;
+        return u8::MAX;
     }
 
     let mut kind = 0;
@@ -67,10 +67,10 @@ pub fn chitoi(hand: &Hand) -> u32 {
 
     assert!(dual <= 6);
     // increase if kind is less than 7
-    6 - dual + 7u32.saturating_sub(kind)
+    6 - dual + 7u8.saturating_sub(kind)
 }
 
-fn all_pattern(bucket: &mut Bucket, men: u32, ta: u32, start: u8) -> u32 {
+fn all_pattern(bucket: &mut Bucket, men: u8, ta: u8, start: u8) -> u8 {
     debug_assert!(men <= 4);
     // calculate the current value
     let mut val = men * 2 + ta.min(4 - men);
@@ -123,10 +123,10 @@ fn all_pattern(bucket: &mut Bucket, men: u32, ta: u32, start: u8) -> u32 {
     val
 }
 
-pub fn normal(hand: &Hand) -> u32 {
+pub fn normal(hand: &Hand) -> u8 {
     hand_check(hand);
 
-    let fixed_men = hand.mianzi_list.len() as u32;
+    let fixed_men = hand.mianzi_list.len() as u8;
     let mut bucket = hand.bucket;
 
     let mut progress = 0;
@@ -209,10 +209,10 @@ mod tests {
             ShantenType::Kokushi => 15,
             ShantenType::Chitoi => 16,
         };
-        let exp = nums[exp_ind].max(0) as u32;
+        let exp = nums[exp_ind].max(0) as u8;
 
         // remove one and take the minimum value
-        let mut sol = u32::MAX;
+        let mut sol = u8::MAX;
         for del in 0..14 {
             let mut hand: Hand = Default::default();
             for (i, &pai) in hand14.iter().enumerate() {
