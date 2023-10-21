@@ -272,8 +272,8 @@ mod tests {
         process_file("p_hon_10000.txt", ShantenType::Chitoi)
     }
 
-    // cargo test -- --ignored
-    // cargo test -- --include-ignored
+    // cargo test --release -- --ignored
+    // cargo test --release --include-ignored
     #[test]
     #[ignore]
     fn heavy_tin_n() -> Result<()> {
