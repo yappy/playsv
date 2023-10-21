@@ -1,6 +1,6 @@
 use crate::mainapp::{HitBox, ImageSet};
 use game::mjsys::{
-    self,
+    self, shanten,
     yaku::{Yaku, Yakuman},
     Hand, Mianzi, MianziType, Point, PointParam, Reach,
 };
@@ -21,6 +21,7 @@ pub struct TestMode {
     fulou_hit: Vec<HitBox>,
 
     input_mode: u32,
+    shanten: Option<(u8, u8, u8)>,
     judge_string: [Vec<String>; 4],
 }
 
@@ -68,6 +69,7 @@ impl TestMode {
             fulou_hit: Default::default(),
 
             input_mode: 0,
+            shanten: None,
             judge_string: Default::default(),
         };
         s.init_input_hitbox();
@@ -147,9 +149,22 @@ impl TestMode {
         }
     }
 
-    fn judge(&self, tumo: bool, field_wind: u8, self_wind: u8) -> Option<Point> {
-        log::info!("{:?}, {}", self.hand, self.finish.unwrap());
+    fn shanten(&self) -> (u8, u8, u8) {
+        let mut hand = Hand {
+            mianzi_list: self.fulou.clone(),
+            finish_pai: self.finish,
+            ..Default::default()
+        };
+        mjsys::to_bucket(&mut hand.bucket, &self.hand);
 
+        (
+            shanten::normal(&hand),
+            shanten::kokushi(&hand),
+            shanten::chitoi(&hand),
+        )
+    }
+
+    fn judge(&self, tumo: bool, field_wind: u8, self_wind: u8) -> Option<Point> {
         let mut hand = Hand {
             mianzi_list: self.fulou.clone(),
             finish_pai: self.finish,
@@ -226,6 +241,8 @@ impl TestMode {
     fn update_judge(&mut self) {
         assert!(self.hand.len() <= mjsys::HAND_BEFORE_DRAW);
         if self.hand.len() + self.fulou.len() * 3 == mjsys::HAND_BEFORE_DRAW {
+            self.shanten = Some(self.shanten());
+
             if self.finish.is_some() {
                 let pt = self.judge(true, 0, 0);
                 let pr = self.judge(false, 0, 0);
@@ -250,6 +267,8 @@ impl TestMode {
                 }
             }
         } else {
+            self.shanten = None;
+
             for v in self.judge_string.iter_mut() {
                 v.clear();
                 v.push("少牌".to_string());
@@ -336,13 +355,34 @@ impl TestMode {
             }
         }
 
+        if let Some((sn, sk, sc)) = self.shanten {
+            // shanten
+            const INIT_X: u32 = 20;
+            const INIT_Y: u32 = 50;
+            const FONT_H: u32 = 16;
+            const TEXT_W: u32 = 100;
+            let texts = [
+                format!("普: {} 向聴", sn),
+                format!("国: {} 向聴", sk),
+                format!("七: {} 向聴", sc),
+            ];
+            context.set_fill_style(&"white".to_string().into());
+            context.set_font(&format!("{FONT_H}px serif"));
+            for (i, text) in texts.iter().enumerate() {
+                let i = i as u32;
+                context
+                    .fill_text(text, (INIT_X + TEXT_W * i) as f64, INIT_Y as f64)
+                    .unwrap();
+            }
+        }
         {
             // judge string
-            const INIT_Y: u32 = 50;
+            const INIT_X: u32 = 20;
+            const INIT_Y: u32 = 80;
             const FONT_H: u32 = 16;
             const JUDGE_W: u32 = 200;
             let mut jy = INIT_Y;
-            let mut jx = 20;
+            let mut jx = INIT_X;
             context.set_fill_style(&"white".to_string().into());
             context.set_font(&format!("{FONT_H}px serif"));
             for v in self.judge_string.iter() {
