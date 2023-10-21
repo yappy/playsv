@@ -4,7 +4,7 @@ on: [push, pull_request]
 
 env:
   # treat warnings as error
-  # RUSTFLAGS: "-Dwarnings"
+  RUSTFLAGS: "-Dwarnings"
   CARGO_TERM_COLOR: always
 
 jobs:
