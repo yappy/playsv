@@ -215,9 +215,9 @@ mod tests {
         let mut sol = u32::MAX;
         for del in 0..14 {
             let mut hand: Hand = Default::default();
-            for i in 0..14 {
+            for (i, &pai) in hand14.iter().enumerate() {
                 if i != del {
-                    hand.bucket[hand14[i] as usize] += 1;
+                    hand.bucket[pai as usize] += 1;
                 }
             }
             sol = match stype {
