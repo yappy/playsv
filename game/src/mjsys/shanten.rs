@@ -1,4 +1,6 @@
-use super::{Hand, PAI_COUNT_U8};
+use crate::mjsys::KIND_Z;
+
+use super::{Bucket, Hand, PAI_COUNT_U8};
 
 fn hand_check(hand: &Hand) {
     let count = super::bucket_count(&hand.bucket);
@@ -68,9 +70,79 @@ pub fn chitoi(hand: &Hand) -> u32 {
     6 - dual + 7u32.saturating_sub(kind)
 }
 
+fn all_pattern(bucket: &mut Bucket, men: u32, ta: u32, start: u8) -> u32 {
+    debug_assert!(men <= 4);
+    let mut val = men * 2 + ta.min(4 - men);
+
+    for pai in start..PAI_COUNT_U8 {
+        let ind = pai as usize;
+        let (kind, num) = super::decode(pai);
+        if bucket[ind] >= 3 {
+            // take triple
+            bucket[ind] -= 3;
+            val = all_pattern(bucket, men + 1, ta, pai).max(val);
+            bucket[ind] += 3;
+        }
+        if bucket[ind] >= 2 {
+            // take pre-triple
+            bucket[ind] -= 2;
+            val = all_pattern(bucket, men, ta + 1, pai).max(val);
+            bucket[ind] += 2;
+        }
+        if bucket[ind] >= 1 && kind != KIND_Z {
+            // take order
+            if num <= 7 && bucket[ind + 1] >= 1 && bucket[ind + 2] >= 1 {
+                bucket[ind] -= 1;
+                bucket[ind + 1] -= 1;
+                bucket[ind + 2] -= 1;
+                val = all_pattern(bucket, men + 1, ta, pai).max(val);
+                bucket[ind + 2] += 1;
+                bucket[ind + 1] += 1;
+                bucket[ind] += 1;
+            }
+            // take pre-order
+            if num <= 8 && bucket[ind + 1] >= 1 {
+                bucket[ind] -= 1;
+                bucket[ind + 1] -= 1;
+                val = all_pattern(bucket, men, ta + 1, pai).max(val);
+                bucket[ind + 1] += 1;
+                bucket[ind] += 1;
+            }
+            if num <= 7 && bucket[ind + 2] >= 1 {
+                bucket[ind] -= 1;
+                bucket[ind + 2] -= 1;
+                val = all_pattern(bucket, men, ta + 1, pai).max(val);
+                bucket[ind + 2] += 1;
+                bucket[ind] += 1;
+            }
+        }
+    }
+
+    val
+}
+
 pub fn normal(hand: &Hand) -> u32 {
     hand_check(hand);
-    todo!()
+
+    let fixed_men = hand.mianzi_list.len() as u32;
+    let mut bucket = hand.bucket;
+
+    let mut progress = 0;
+    for head in 0..=PAI_COUNT_U8 {
+        if head == PAI_COUNT_U8 {
+            // ho head at last
+            progress = all_pattern(&mut bucket, fixed_men, 0, 0).max(progress);
+        } else if bucket[head as usize] >= 2 {
+            // assume head
+            bucket[head as usize] -= 2;
+            let tmp = all_pattern(&mut bucket, fixed_men, 0, 0) + 1;
+            progress = tmp.max(progress);
+            bucket[head as usize] += 2;
+        }
+    }
+
+    debug_assert!(progress <= 8);
+    8 - progress
 }
 
 #[cfg(test)]
@@ -113,53 +185,72 @@ mod tests {
     }
 
     #[test]
-    fn full() -> Result<()> {
-        fn process_line(nums: &[i8], filename: &str, lineno: usize) {
-            let hand14 = &nums[0..14];
-            // if agari, -1: for all hand13, shanten = 0
-            //let exp_n = nums[14].max(0) as u32;
-            let exp_k = nums[15].max(0) as u32;
-            let exp_c = nums[16].max(0) as u32;
-
-            //let mut n_min = u32::MAX;
-            let mut k_min = u32::MAX;
-            let mut c_min = u32::MAX;
-            for del in 0..14 {
-                let mut hand: Hand = Default::default();
-                for i in 0..14 {
-                    if i != del {
-                        hand.bucket[hand14[i] as usize] += 1;
-                    }
-                }
-                //let n_min = normal(&hand).min(n_min);
-                k_min = kokushi(&hand).min(k_min);
-                c_min = chitoi(&hand).min(c_min);
-            }
-            assert_eq!(exp_k, k_min, "{filename}:{lineno}");
-            assert_eq!(exp_c, c_min, "{filename}:{lineno}");
-        }
-
-        fn process_file(filename: &str) -> Result<()> {
-            let path: PathBuf = [env!("CARGO_MANIFEST_DIR"), "testres", filename]
-                .iter()
-                .collect();
-            for (no, line) in fs::read_to_string(&path)?.lines().enumerate() {
-                let mut nums = [0i8; 17];
-                line.split_ascii_whitespace()
-                    .enumerate()
-                    .for_each(|(i, tok)| nums[i] = tok.parse::<i8>().unwrap());
-
-                process_line(&nums, filename, no + 1)
-            }
-
-            Ok(())
-        }
-
-        process_file("p_normal_10000.txt").unwrap();
-        process_file("p_hon_10000.txt").unwrap();
-        process_file("p_tin_10000.txt").unwrap();
-        process_file("p_koku_10000.txt").unwrap();
+    fn normal_only() -> Result<()> {
+        let hand = from_human_readable_string("123999m456888p1z")?;
+        assert_eq!(0, normal(&hand));
 
         Ok(())
+    }
+
+    fn process_line(nums: &[i8], filename: &str, lineno: usize) {
+        let hand14 = &nums[0..14];
+        // if agari, -1: for all hand13, shanten = 0
+        let exp_n = nums[14].max(0) as u32;
+        let exp_k = nums[15].max(0) as u32;
+        let exp_c = nums[16].max(0) as u32;
+
+        let mut n_min = u32::MAX;
+        let mut k_min = u32::MAX;
+        let mut c_min = u32::MAX;
+        for del in 0..14 {
+            let mut hand: Hand = Default::default();
+            for i in 0..14 {
+                if i != del {
+                    hand.bucket[hand14[i] as usize] += 1;
+                }
+            }
+            n_min = normal(&hand).min(n_min);
+            k_min = kokushi(&hand).min(k_min);
+            c_min = chitoi(&hand).min(c_min);
+        }
+        assert_eq!(exp_n, n_min, "{filename}:{lineno}");
+        assert_eq!(exp_k, k_min, "{filename}:{lineno}");
+        assert_eq!(exp_c, c_min, "{filename}:{lineno}");
+    }
+
+    fn process_file(filename: &str) -> Result<()> {
+        let path: PathBuf = [env!("CARGO_MANIFEST_DIR"), "testres", filename]
+            .iter()
+            .collect();
+        for (no, line) in fs::read_to_string(&path)?.lines().enumerate() {
+            let mut nums = [0i8; 17];
+            line.split_ascii_whitespace()
+                .enumerate()
+                .for_each(|(i, tok)| nums[i] = tok.parse::<i8>().unwrap());
+
+            process_line(&nums, filename, no + 1)
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn heavy_normal() -> Result<()> {
+        process_file("p_normal_10000.txt")
+    }
+
+    #[test]
+    fn heavy_hon() -> Result<()> {
+        process_file("p_hon_10000.txt")
+    }
+
+    #[test]
+    fn heavy_tin() -> Result<()> {
+        process_file("p_tin_10000.txt")
+    }
+
+    #[test]
+    fn heavy_koku() -> Result<()> {
+        process_file("p_koku_10000.txt")
     }
 }
