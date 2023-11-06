@@ -22,6 +22,8 @@ use yaku::Yakuman;
 pub const PAI_COUNT: usize = 34;
 pub const PAI_COUNT_U8: u8 = 34;
 pub const PAI_INVALID: u8 = 0xff;
+pub const NUM_COUNT: usize = 9;
+pub const NUM_COUNT_U8: u8 = 9;
 pub const HAND_BEFORE_DRAW: usize = 13;
 pub const HAND_AFTER_DRAW: usize = 14;
 pub const OFFSET_M: u8 = 0;
@@ -33,7 +35,8 @@ pub const KIND_P: u8 = 1;
 pub const KIND_S: u8 = 2;
 pub const KIND_Z: u8 = 3;
 
-type Bucket = [u8; PAI_COUNT];
+pub type Bucket = [u8; PAI_COUNT];
+pub type PartialBucket = [u8; NUM_COUNT];
 
 pub fn empty_bucket() -> Bucket {
     [0; PAI_COUNT]
@@ -41,6 +44,16 @@ pub fn empty_bucket() -> Bucket {
 
 pub fn bucket_count(bucket: &Bucket) -> u32 {
     bucket.iter().fold(0, |sum, &c| sum + c as u32)
+}
+
+pub fn split_bucket(bucket: &Bucket) -> [PartialBucket; 4] {
+    let mut res:[PartialBucket; 4] = Default::default();
+    res[0].copy_from_slice(&bucket[0..9]);
+    res[1].copy_from_slice(&bucket[9..18]);
+    res[2].copy_from_slice(&bucket[18..27]);
+    res[3].copy_from_slice(&bucket[27..34]);
+
+    res
 }
 
 fn validate(kind: u8, num: u8) -> Result<()> {

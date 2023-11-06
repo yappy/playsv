@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "game",
     "playsv",
+    "prebuild"
 ]
 exclude = [
     "client"
